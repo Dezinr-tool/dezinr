@@ -32,7 +32,7 @@ export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComment
   const [filter, setFilter] = useState<Filter>("all");
   const [savingId, setSavingId] = useState<number | null>(null);
   const [activeCommentId, setActiveCommentId] = useState<number | null>(null);
-  const [imageLoading, setImageLoading] = useState(true);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
 
   const filtered = useMemo(() => {
@@ -40,9 +40,7 @@ export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComment
     return comments.filter((c) => c.priority === filter);
   }, [comments, filter]);
 
-  const screenshotUrl = `https://api.microlink.io/?url=${encodeURIComponent(
-    stagingUrl,
-  )}&screenshot=true&meta=false&embed=screenshot.url`;
+  const screenshotUrl = `https://image.thum.io/get/width/1440/crop/900/${stagingUrl}`;
 
   async function updateStatus(commentId: number, status: QcStatus) {
     setSavingId(commentId);
@@ -67,23 +65,23 @@ export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComment
   function getPinPosition(comment: QcComment, index: number, total: number) {
     const section = comment.section.toLowerCase();
     if (section.includes("navigation") || section.includes("nav")) {
-      return { top: "4%", left: "50%" };
+      return { top: "3%", left: "50%" };
     }
     if (section.includes("hero")) {
       return { top: "20%", left: "50%" };
     }
-    if (section.includes("footer")) {
-      return { top: "92%", left: "50%" };
+    if (section.includes("features") || section.includes("cards") || section.includes("card")) {
+      return { top: "45%", left: "50%" };
     }
-    if (section.includes("cards") || section.includes("card")) {
-      return { top: "50%", left: "50%" };
+    if (section.includes("footer")) {
+      return { top: "85%", left: "50%" };
     }
     if (section.includes("cta")) {
-      return { top: "40%", left: "50%" };
+      return { top: "60%", left: "50%" };
     }
-    const step = 70 / Math.max(1, total);
+    const step = 75 / Math.max(1, total);
     return {
-      top: `${Math.min(88, 15 + step * index)}%`,
+      top: `${Math.min(90, 10 + step * index)}%`,
       left: `${20 + ((index * 17) % 60)}%`,
     };
   }
@@ -165,7 +163,7 @@ export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComment
 
       <section className="rounded-xl border border-zinc-200 p-2 dark:border-zinc-800">
         <div className="relative min-h-[520px] overflow-hidden rounded-md border border-zinc-200 bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900">
-          {imageLoading ? (
+          {!imageLoaded && !imageError ? (
             <div className="absolute inset-0 flex items-center justify-center text-sm text-zinc-600 dark:text-zinc-300">
               Loading staging preview...
             </div>
@@ -183,22 +181,25 @@ export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComment
                 rel="noreferrer"
                 className="rounded-md bg-foreground px-3 py-1.5 text-sm text-background"
               >
-                Open Staging
+                Open Staging Site
               </a>
+              <p className="max-w-xl text-xs text-zinc-600 dark:text-zinc-300">
+                View staging site directly and refer to numbered issues on left
+              </p>
             </div>
           ) : (
             <img
               src={screenshotUrl}
-              alt="Staging preview screenshot"
+              alt="Staging preview"
               onLoad={() => {
-                setImageLoading(false);
+                setImageLoaded(true);
                 setImageError(false);
               }}
               onError={() => {
-                setImageLoading(false);
+                setImageLoaded(false);
                 setImageError(true);
               }}
-              className={`h-auto w-full ${imageLoading ? "opacity-0" : "opacity-100"}`}
+              style={{ width: "100%", height: "auto" }}
             />
           )}
 
