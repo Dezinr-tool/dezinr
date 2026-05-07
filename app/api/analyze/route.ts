@@ -16,15 +16,63 @@ Use this exact structure:
   "overall_score": <number 0-100>,
   "summary": "<2-3 sentences like a mentor speaking directly to the designer>",
   "categories": {
-    "visual_hierarchy": {"score": <0-100>, "issues": ["<specific issue>"], "suggestions": ["<actionable advice>"]},
-    "ux_consistency": {"score": <0-100>, "issues": ["<specific issue>"], "suggestions": ["<actionable advice>"]},
-    "conversion_potential": {"score": <0-100>, "issues": ["<specific issue>"], "suggestions": ["<actionable advice>"]},
-    "accessibility": {"score": <0-100>, "issues": ["<specific issue>"], "suggestions": ["<actionable advice>"]},
-    "content_clarity": {"score": <0-100>, "issues": ["<specific issue>"], "suggestions": ["<actionable advice>"]}
+    "visual_hierarchy": {
+      "score": <0-100>,
+      "issues": [{"text": "<the issue description>", "priority": "<must_have OR good_to_have OR advanced>", "impact": "<one line business impact>"}],
+      "suggestions": [{"text": "<the suggestion>", "priority": "<must_have OR good_to_have OR advanced>"}]
+    },
+    "ux_consistency": {
+      "score": <0-100>,
+      "issues": [{"text": "<the issue description>", "priority": "<must_have OR good_to_have OR advanced>", "impact": "<one line business impact>"}],
+      "suggestions": [{"text": "<the suggestion>", "priority": "<must_have OR good_to_have OR advanced>"}]
+    },
+    "conversion_potential": {
+      "score": <0-100>,
+      "issues": [{"text": "<the issue description>", "priority": "<must_have OR good_to_have OR advanced>", "impact": "<one line business impact>"}],
+      "suggestions": [{"text": "<the suggestion>", "priority": "<must_have OR good_to_have OR advanced>"}]
+    },
+    "accessibility": {
+      "score": <0-100>,
+      "issues": [{"text": "<the issue description>", "priority": "<must_have OR good_to_have OR advanced>", "impact": "<one line business impact>"}],
+      "suggestions": [{"text": "<the suggestion>", "priority": "<must_have OR good_to_have OR advanced>"}]
+    },
+    "content_clarity": {
+      "score": <0-100>,
+      "issues": [{"text": "<the issue description>", "priority": "<must_have OR good_to_have OR advanced>", "impact": "<one line business impact>"}],
+      "suggestions": [{"text": "<the suggestion>", "priority": "<must_have OR good_to_have OR advanced>"}]
+    },
+    "information_architecture": {
+      "score": <0-100>,
+      "issues": [{"text": "<the issue description>", "priority": "<must_have OR good_to_have OR advanced>", "impact": "<one line business impact>"}],
+      "suggestions": [{"text": "<the suggestion>", "priority": "<must_have OR good_to_have OR advanced>"}]
+    },
+    "product_strategy": {
+      "score": <0-100>,
+      "issues": [{"text": "<the issue description>", "priority": "<must_have OR good_to_have OR advanced>", "impact": "<one line business impact>"}],
+      "suggestions": [{"text": "<the suggestion>", "priority": "<must_have OR good_to_have OR advanced>"}]
+    }
   },
   "top_3_priorities": ["<priority 1>", "<priority 2>", "<priority 3>"],
   "ab_test_suggestion": "<one specific A/B test idea>"
-}`;
+}
+
+Priority definitions:
+- must_have: Fixing this directly affects conversion or trust. Do this first.
+- good_to_have: Improves experience but not urgent.
+- advanced: Nice to have, complex to implement.
+
+For information_architecture, review:
+- Navigation structure and labeling
+- User flow and journey logic
+- Page hierarchy and findability
+- Missing or misplaced sections
+
+For product_strategy, review:
+- Value proposition clarity
+- Target audience alignment
+- CTA placement and messaging
+- Business goal vs user goal balance
+- Conversion funnel logic`;
 
 function textFromMessage(content: Anthropic.Message["content"]): string {
   return content
