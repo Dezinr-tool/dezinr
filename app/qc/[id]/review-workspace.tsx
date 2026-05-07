@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { QcComment, QcPriority, QcStatus } from "@/lib/qc-types";
 
 type Props = {
@@ -10,6 +10,7 @@ type Props = {
 };
 
 type Filter = "all" | QcPriority;
+type ViewportMode = "desktop" | "mobile";
 
 function priorityBadge(priority: QcPriority) {
   if (priority === "must_fix") {
@@ -30,9 +31,12 @@ function priorityLabel(priority: QcPriority) {
 export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComments }: Props) {
   const [comments, setComments] = useState(initialComments);
   const [filter, setFilter] = useState<Filter>("all");
+  const [viewportMode, setViewportMode] = useState<ViewportMode>("desktop");
   const [savingId, setSavingId] = useState<number | null>(null);
   const [activeCommentId, setActiveCommentId] = useState<number | null>(null);
   const [iframeError, setIframeError] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const previewCanvasHeight = 2000;
 
   const filtered = useMemo(() => {
     if (filter === "all") return comments;
@@ -65,26 +69,33 @@ export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComment
       return { top: "3%", left: "50%" };
     }
     if (section.includes("hero")) {
-      return { top: "20%", left: "50%" };
+      return { top: "15%", left: "50%" };
     }
     if (section.includes("features") || section.includes("cards") || section.includes("card")) {
-      return { top: "45%", left: "50%" };
+      return { top: "35%", left: "50%" };
     }
     if (section.includes("footer")) {
-      return { top: "85%", left: "50%" };
+      return { top: "80%", left: "50%" };
     }
     if (section.includes("cta")) {
-      return { top: "60%", left: "50%" };
+      return { top: "55%", left: "50%" };
     }
-    const step = 75 / Math.max(1, total);
+    const step = 90 / Math.max(1, total);
     return {
-      top: `${Math.min(90, 10 + step * index)}%`,
+      top: `${Math.min(90, step * index)}%`,
       left: `${20 + ((index * 17) % 60)}%`,
     };
   }
 
   function highlightComment(commentId: number) {
     setActiveCommentId(commentId);
+    const idx = comments.findIndex((comment) => comment.id === commentId);
+    if (idx < 0) return;
+    const pos = getPinPosition(comments[idx], idx, comments.length);
+    const topPercent = Number.parseFloat(pos.top);
+    if (Number.isNaN(topPercent)) return;
+    const target = (topPercent / 100) * previewCanvasHeight - 120;
+    scrollContainerRef.current?.scrollTo({ top: Math.max(0, target), behavior: "smooth" });
   }
 
   return (
@@ -159,6 +170,30 @@ export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComment
       </section>
 
       <section className="rounded-xl border border-zinc-200 p-2 dark:border-zinc-800">
+        <div className="mb-2 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setViewportMode("desktop")}
+            className={`rounded-md border px-3 py-1.5 text-sm ${
+              viewportMode === "desktop"
+                ? "border-foreground bg-foreground text-background"
+                : "border-zinc-300 dark:border-zinc-600"
+            }`}
+          >
+            Desktop
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewportMode("mobile")}
+            className={`rounded-md border px-3 py-1.5 text-sm ${
+              viewportMode === "mobile"
+                ? "border-foreground bg-foreground text-background"
+                : "border-zinc-300 dark:border-zinc-600"
+            }`}
+          >
+            Mobile
+          </button>
+        </div>
         <div className="overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-800">
           <div className="border-b border-zinc-300 bg-zinc-200 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-800">
             <p className="truncate text-xs text-zinc-700 dark:text-zinc-200">
@@ -166,7 +201,17 @@ export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComment
             </p>
           </div>
 
-          <div className="relative min-h-[600px] bg-zinc-100 dark:bg-zinc-900">
+          <div
+            ref={scrollContainerRef}
+            className="h-[70vh] overflow-y-auto bg-zinc-100 dark:bg-zinc-900"
+          >
+            <div
+              className="relative mx-auto"
+              style={{
+                minHeight: `${previewCanvasHeight}px`,
+                width: viewportMode === "mobile" ? "390px" : "100%",
+              }}
+            >
             {iframeError ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-zinc-200/80 px-4 text-center dark:bg-zinc-900/80">
                 <p className="text-sm font-medium">Preview blocked by site security</p>
@@ -183,7 +228,7 @@ export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComment
               <iframe
                 src={stagingUrl}
                 sandbox="allow-scripts allow-same-origin"
-                style={{ width: "100%", height: "600px", border: "none" }}
+                style={{ width: "100%", height: `${previewCanvasHeight}px`, border: "none" }}
                 onError={() => setIframeError(true)}
                 onLoad={() => setIframeError(false)}
                 title="Staging preview"
@@ -211,6 +256,7 @@ export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComment
                 </button>
               );
             })}
+            </div>
           </div>
         </div>
       </section>
