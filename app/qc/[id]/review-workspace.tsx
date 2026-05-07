@@ -211,7 +211,8 @@ export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComment
         setPopupError(json.error ?? "Could not add comment");
         return;
       }
-      setComments((prev) => [...prev, json.comment]);
+      const addedComment = json.comment;
+      setComments((prev) => [...prev, addedComment]);
       setPopup(null);
       setPopupIssue("");
     } catch {
