@@ -23,7 +23,9 @@ Use exactly this structure:
       "status": "open"
     }
   ]
-}`;
+}
+
+IMPORTANT: Use double quotes for all JSON keys and string values. Never use single quotes.`;
 
 function textFromMessage(content: Anthropic.Message["content"]): string {
   return content
@@ -81,6 +83,7 @@ export async function POST(request: Request) {
     const clean = rawText
       .replace(/```json/g, "")
       .replace(/```/g, "")
+      .replace(/'/g, "\"")
       .trim();
     let parsed: unknown;
     try {
