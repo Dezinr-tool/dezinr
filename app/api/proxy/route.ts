@@ -31,7 +31,7 @@ export async function GET(request: Request) {
     const upstream = await fetch(parsed.toString(), {
       method: "GET",
       headers: {
-        "User-Agent": "DesignScan-QC-Proxy",
+        "User-Agent": "Dezinr-QC-Proxy",
         Accept: "text/html,application/xhtml+xml",
       },
       cache: "no-store",

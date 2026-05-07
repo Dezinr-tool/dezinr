@@ -1,0 +1,55 @@
+# Project Context
+This is a Next.js design audit SaaS tool called
+Dezinr. Built with Next.js App Router,
+Tailwind CSS, Supabase, and Anthropic Claude API.
+
+# Code Quality Rules — Auto check and fix these:
+
+## General
+- Always use TypeScript types properly — no 'any'
+- Every API route must have try/catch error handling
+- Every async function must handle errors
+- No console.log in production code — use
+  console.error only for actual errors
+- All environment variables must be accessed via
+  process.env — never hardcode
+
+## Next.js Specific
+- Always use App Router patterns
+- Server components by default
+- Client components only when needed —
+  add 'use client' directive
+- API routes must return proper HTTP status codes
+  200, 400, 401, 500 etc.
+- Never expose API keys to client side
+
+## Supabase
+- Always check for errors in Supabase responses
+- Use RLS policies — never bypass security
+- Always handle null/undefined from DB queries
+
+## Claude API
+- Always strip markdown before JSON.parse
+- Always wrap JSON.parse in try/catch
+- Always set max_tokens explicitly
+- Model string must be 'claude-sonnet-4-6'
+
+## UI / Tailwind
+- Mobile responsive is required —
+  use sm: md: lg: breakpoints
+- No inline styles — Tailwind only
+- Loading states required on all async actions
+- Error states required on all forms
+
+## Before Every Commit
+- Check for unused imports
+- Check for missing error handling
+- Check TypeScript errors
+- Make sure no hardcoded strings that
+  should be env variables
+
+# Tone & Output Style
+- Code comments in English
+- Variable names descriptive — no x, y, temp
+- Functions should do one thing only
+- Keep files under 200 lines — split if needed

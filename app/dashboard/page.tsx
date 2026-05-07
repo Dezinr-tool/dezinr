@@ -27,7 +27,7 @@ export default async function DashboardPage() {
     <div className="mx-auto max-w-3xl px-4 py-10">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Dashboard</h1>
+          <h1 className="text-2xl font-semibold">Dezinr Dashboard</h1>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
             Signed in as {user.email}
           </p>

@@ -1,5 +1,5 @@
 {
-  "name": "design-scanner",
+  "name": "dezinr",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,6 +9,9 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.95.0",
+    "@supabase/ssr": "^0.10.2",
+    "@supabase/supabase-js": "^2.105.3",
     "next": "16.2.5",
     "react": "19.2.4",
     "react-dom": "19.2.4"
