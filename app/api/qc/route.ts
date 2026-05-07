@@ -3,32 +3,36 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isQcReviewPayload } from "@/lib/qc-types";
 
-const QC_SYSTEM_PROMPT = `You are a UI design reviewer. Return ONLY a JSON object. No markdown. No backticks. Start with { end with }.
+const QC_SYSTEM_PROMPT = `You are a UI design reviewer.
+Analyze the given website URL and return ONLY 
+a valid JSON object.
 
-Use exactly this structure:
+Rules:
+- Use double quotes only
+- No CSS code in any field
+- No special characters
+- Keep all text simple and plain
+- Maximum 8 comments
+
+JSON format:
 {
-  "project_name": "site name",
-  "total_issues": 5,
-  "must_fix_count": 2,
-  "minor_count": 2,
-  "suggestion_count": 1,
+  "project_name": "Site Name",
+  "total_issues": 8,
+  "must_fix_count": 3,
+  "minor_count": 3,
+  "suggestion_count": 2,
   "comments": [
     {
       "id": 1,
       "section": "Hero",
-      "issue": "what is wrong",
-      "figma_reference": "how it should look",
-      "fix": "plain English instruction for developer, no CSS code, no quotes — just describe what to change",
+      "issue": "The main headline is too small",
+      "figma_reference": "Should be larger and bold",
+      "fix": "Increase font size and weight",
       "priority": "must_fix",
       "status": "open"
     }
   ]
-}
-
-IMPORTANT: Use double quotes for all JSON keys and string values. Never use single quotes.
-Return maximum 10 comments.
-Keep all text values simple — no CSS, no code,
-no special characters in any field value.`;
+}`;
 
 function textFromMessage(content: Anthropic.Message["content"]): string {
   return content
