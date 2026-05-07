@@ -7,22 +7,28 @@ import { NewReviewForm } from "./new-review-form";
 export default async function QcPage() {
   const supabase = await createClient();
   const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) redirect("/login");
+
+  const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/login?next=/qc");
+  if (!user) redirect("/login");
 
   const { data: reviews, error } = await supabase
     .from("qc_reviews")
     .select(
-      "id, project_name, staging_url, total_issues, must_fix_count, minor_count, suggestion_count, comments, created_at",
+      "id, project_name, staging_url, total_issues, must_fix_count, minor_count, suggestion_count, ai_comments, created_at",
     )
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
   if (error) {
-    console.error("[qc] load reviews", error);
+    console.error("[qc] load reviews error:", JSON.stringify(error));
   }
+  const rows = reviews ?? [];
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
@@ -39,14 +45,14 @@ export default async function QcPage() {
 
       <section className="mt-10">
         <h2 className="text-lg font-medium">Past QC Reviews</h2>
-        {!reviews?.length ? (
+        {!rows.length ? (
           <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
             No QC reviews yet. Start with a new review above.
           </p>
         ) : (
           <div className="mt-4 grid gap-3">
-            {reviews.map((review) => {
-              const comments = (review.comments as unknown as QcComment[]) ?? [];
+            {rows.map((review) => {
+              const comments = (review.ai_comments as unknown as QcComment[]) ?? [];
               const resolved = comments.filter((c) => c.status === "resolved").length;
               const progress =
                 review.total_issues > 0
