@@ -3,7 +3,11 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isQcReviewPayload } from "@/lib/qc-types";
 
-const QC_SYSTEM_PROMPT = `You are a senior UI designer reviewing a developer's implementation against a Figma design.
+const QC_SYSTEM_PROMPT = `CRITICAL: Respond with ONLY raw JSON.
+Start with { and end with }.
+No markdown, no backticks, no explanation.
+
+You are a senior UI designer reviewing a developer's implementation against a Figma design.
 
 Analyze the staging URL and generate specific feedback comments like a designer would leave for a developer.
 
@@ -40,13 +44,6 @@ function textFromMessage(content: Anthropic.Message["content"]): string {
     .map((block) => (block.type === "text" ? block.text : ""))
     .join("")
     .trim();
-}
-
-function stripMarkdownJsonFence(text: string): string {
-  const trimmed = text.trim();
-  const fenceMatch = /^```(?:json)?\s*([\s\S]*?)\s*```$/im.exec(trimmed);
-  if (fenceMatch) return fenceMatch[1].trim();
-  return trimmed.replace(/`/g, "").trim();
 }
 
 export async function POST(request: Request) {
@@ -94,11 +91,16 @@ export async function POST(request: Request) {
     });
 
     const raw = textFromMessage(message.content);
-    const cleaned = stripMarkdownJsonFence(raw);
+    console.log("[api/qc] raw Claude response", raw);
+    const clean = raw
+      .replace(/```json/g, "")
+      .replace(/```/g, "")
+      .trim();
     let parsed: unknown;
     try {
-      parsed = JSON.parse(cleaned);
-    } catch {
+      parsed = JSON.parse(clean);
+    } catch (err) {
+      console.error("[api/qc] JSON.parse failed", err);
       return NextResponse.json(
         { error: "Model returned invalid JSON", detail: raw.slice(0, 400) },
         { status: 502 },
