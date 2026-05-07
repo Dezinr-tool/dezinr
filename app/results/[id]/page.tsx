@@ -138,8 +138,8 @@ export default async function ResultsPage({
   const isMulti = isMultiPageAnalysisAiResponse(rawAi);
   const singleAi = rawAi as AnalysisAiResponse;
   const multiAi = isMulti ? rawAi : null;
-  const headerScore = isMulti ? Math.round(multiAi.overall_score) : row.score;
-  const headerSummary = isMulti ? multiAi.summary : singleAi.summary;
+  const headerScore = multiAi ? Math.round(multiAi.overall_score) : row.score;
+  const headerSummary = multiAi ? multiAi.summary : singleAi.summary;
   const priorities = isMulti
     ? []
     : Array.isArray(singleAi.top_3_priorities)
