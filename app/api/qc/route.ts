@@ -60,12 +60,17 @@ export async function POST(request: Request) {
 
     const figmaUrl = body.figma_url?.trim();
     const stagingUrl = body.staging_url?.trim();
+    const requestUserId = body.user_id?.trim();
     if (!figmaUrl || !stagingUrl) {
       return NextResponse.json(
         { error: "figma_url and staging_url are required" },
         { status: 400 },
       );
     }
+    if (requestUserId && requestUserId !== user.id) {
+      return NextResponse.json({ error: "user_id mismatch" }, { status: 401 });
+    }
+    const userIdForInsert = requestUserId ?? user.id;
 
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const message = await anthropic.messages.create({
@@ -110,23 +115,27 @@ export async function POST(request: Request) {
     }
 
     const review = parsed;
+    const insertPayload = {
+      project_name: review.project_name,
+      figma_url: figmaUrl,
+      staging_url: stagingUrl,
+      ai_comments: review.comments as unknown as Record<string, unknown>[],
+      total_issues: review.total_issues,
+      must_fix_count: review.must_fix_count,
+      minor_count: review.minor_count,
+      suggestion_count: review.suggestion_count,
+      user_id: userIdForInsert,
+    };
+    console.log("[api/qc] insert payload", insertPayload);
+
     const { data, error } = await supabase
       .from("qc_reviews")
-      .insert({
-        user_id: user.id,
-        figma_url: figmaUrl,
-        staging_url: stagingUrl,
-        project_name: review.project_name,
-        total_issues: review.total_issues,
-        must_fix_count: review.must_fix_count,
-        minor_count: review.minor_count,
-        suggestion_count: review.suggestion_count,
-        comments: review.comments as unknown as Record<string, unknown>[],
-      })
+      .insert(insertPayload)
       .select("id")
       .single();
 
     if (error) {
+      console.error("[api/qc] supabase insert failed", error);
       return NextResponse.json(
         { error: "Failed to save review", detail: error.message },
         { status: 500 },
