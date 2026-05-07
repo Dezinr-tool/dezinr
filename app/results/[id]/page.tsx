@@ -75,7 +75,7 @@ export default async function ResultsPage({
         <p className="text-sm text-zinc-500">
           {row.input_type}: {row.input_value}
         </p>
-        <h1 className="mt-1 text-2xl font-semibold">Analysis results</h1>
+        <h1 className="mt-1 text-2xl font-semibold">Your design feedback</h1>
         <div
           className="mt-5 flex h-32 w-32 items-center justify-center rounded-full border-4 border-foreground text-4xl font-bold"
           aria-label={`Overall score ${row.score} out of 100`}
