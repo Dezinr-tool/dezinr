@@ -27,6 +27,29 @@ export type AnalysisAiResponse = {
   ab_test_suggestion: string;
 };
 
+export type MultiPageAnalysisAiResponse = {
+  overall_score: number;
+  summary: string;
+  common_issues: string[];
+  pages: Array<{
+    page_label: string;
+    input_value: string;
+    result: AnalysisAiResponse;
+  }>;
+};
+
+export function isMultiPageAnalysisAiResponse(
+  v: unknown,
+): v is MultiPageAnalysisAiResponse {
+  if (!v || typeof v !== "object") return false;
+  const o = v as Record<string, unknown>;
+  return (
+    typeof o.overall_score === "number" &&
+    typeof o.summary === "string" &&
+    Array.isArray(o.pages)
+  );
+}
+
 export function isAnalysisAiResponse(v: unknown): v is AnalysisAiResponse {
   if (!v || typeof v !== "object") return false;
   const o = v as Record<string, unknown>;

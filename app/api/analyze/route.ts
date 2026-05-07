@@ -1,7 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { isAnalysisAiResponse } from "@/lib/analysis-types";
+import {
+  isAnalysisAiResponse,
+  type AnalysisAiResponse,
+  type MultiPageAnalysisAiResponse,
+} from "@/lib/analysis-types";
 
 export const maxDuration = 60;
 
@@ -103,6 +107,58 @@ CRITICAL: Output ONLY raw JSON.
 Start with { end with }.
 No markdown, no backticks.`;
 
+function buildCombinedSummary(
+  pages: Array<{ inputValue: string; result: AnalysisAiResponse }>,
+): MultiPageAnalysisAiResponse {
+  const total = pages.reduce((acc, page) => acc + page.result.overall_score, 0);
+  const average = pages.length ? Math.round(total / pages.length) : 0;
+  const weakest = pages.reduce<{ inputValue: string; score: number } | null>(
+    (prev, page) => {
+      if (!prev || page.result.overall_score < prev.score) {
+        return { inputValue: page.inputValue, score: page.result.overall_score };
+      }
+      return prev;
+    },
+    null,
+  );
+
+  const issueCounts = new Map<string, number>();
+  for (const page of pages) {
+    for (const category of Object.values(page.result.categories)) {
+      for (const issue of category.issues ?? []) {
+        const key = issue.trim();
+        if (!key) continue;
+        issueCounts.set(key, (issueCounts.get(key) ?? 0) + 1);
+      }
+    }
+  }
+
+  const commonIssues = Array.from(issueCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([text]) => text);
+
+  const summary =
+    pages.length > 1
+      ? `Audited ${pages.length} pages. Overall quality is ${average}/100. ${
+          weakest
+            ? `The weakest page right now is ${weakest.inputValue} (${weakest.score}/100), so that is the best place to focus first.`
+            : ""
+        }`
+      : pages[0]?.result.summary ?? "No pages were audited.";
+
+  return {
+    overall_score: average,
+    summary,
+    common_issues: commonIssues,
+    pages: pages.map((page, index) => ({
+      page_label: `Page ${index + 1}`,
+      input_value: page.inputValue,
+      result: page.result,
+    })),
+  };
+}
+
 function textFromMessage(content: Anthropic.Message["content"]): string {
   return content
     .map((block) => (block.type === "text" ? block.text : ""))
@@ -148,36 +204,57 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       inputType?: string;
       inputValue?: string;
+      inputValues?: string[];
       imageBase64?: string;
       mediaType?: "image/jpeg" | "image/png" | "image/gif" | "image/webp";
     };
 
     const inputType = body.inputType;
-    if (inputType !== "url" && inputType !== "screenshot") {
+    if (inputType !== "url" && inputType !== "screenshot" && inputType !== "figma") {
       return NextResponse.json({ error: "Invalid inputType" }, { status: 400 });
     }
 
-    let inputValueForDb: string;
-    let userContent: Anthropic.MessageCreateParams["messages"][number]["content"];
+    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    console.log("[api/analyze] calling Claude");
 
-    if (inputType === "url") {
-      const url = (body.inputValue ?? "").trim();
-      if (!url) {
-        return NextResponse.json({ error: "URL required" }, { status: 400 });
+    async function analyzeOne(
+      content: Anthropic.MessageCreateParams["messages"][number]["content"],
+    ): Promise<AnalysisAiResponse> {
+      const message = await anthropic.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 4000,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: "user", content }],
+      });
+
+      const rawText = textFromMessage(message.content);
+      console.log("[api/analyze] raw Claude response", rawText);
+      const cleanedText = stripMarkdownJsonFence(rawText);
+      console.log("[api/analyze] Claude response length", cleanedText.length);
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(cleanedText);
+      } catch (e) {
+        console.error("[api/analyze] JSON.parse failed", e);
+        console.error("[api/analyze] raw Claude response", rawText);
+        throw new Error("Model returned invalid JSON");
       }
-      inputValueForDb = url;
-      let urlNote = "";
-      if (url.includes("figma.com")) {
-        urlNote =
-          "\n\nNote: This is a Figma file URL. You cannot see the canvas; infer what you can from the URL and give a practical design-review checklist and questions the team should validate in Figma and in implementation.";
+
+      if (!isAnalysisAiResponse(parsed)) {
+        console.error("[api/analyze] schema mismatch", parsed);
+        throw new Error("Model JSON did not match expected schema");
       }
-      userContent = [
-        {
-          type: "text",
-          text: `Please analyze this website/staging URL for UX and UI quality: ${url}${urlNote}`,
-        },
-      ];
-    } else {
+
+      return parsed;
+    }
+
+    let inputValueForDb: string;
+    let inputTypeForDb: "url" | "screenshot" | "figma";
+    let aiPayload: AnalysisAiResponse | MultiPageAnalysisAiResponse;
+    let score: number;
+
+    if (inputType === "screenshot") {
       const data = body.imageBase64?.trim();
       const mediaType = body.mediaType ?? "image/png";
       if (!data) {
@@ -186,8 +263,9 @@ export async function POST(request: Request) {
           { status: 400 },
         );
       }
+      inputTypeForDb = "screenshot";
       inputValueForDb = "[Screenshot upload]";
-      userContent = [
+      const result = await analyzeOne([
         {
           type: "image",
           source: { type: "base64", media_type: mediaType, data },
@@ -196,54 +274,63 @@ export async function POST(request: Request) {
           type: "text",
           text: "Analyze this design screenshot for UX and UI quality. Respond with the required JSON only.",
         },
-      ];
+      ]);
+      aiPayload = result;
+      score = Math.round(result.overall_score);
+    } else if (inputType === "figma") {
+      const figmaUrl = (body.inputValue ?? "").trim();
+      if (!figmaUrl) {
+        return NextResponse.json({ error: "Figma URL required" }, { status: 400 });
+      }
+      inputTypeForDb = "figma";
+      inputValueForDb = figmaUrl;
+      const result = await analyzeOne([
+        {
+          type: "text",
+          text: `This is a Figma design file URL: ${figmaUrl}. Analyze the design for: visual hierarchy, spacing consistency, typography, color usage, component consistency, and UX flow. Give feedback like a senior designer reviewing junior designer's work.`,
+        },
+      ]);
+      aiPayload = result;
+      score = Math.round(result.overall_score);
+    } else {
+      const urls =
+        Array.isArray(body.inputValues) && body.inputValues.length > 0
+          ? body.inputValues.map((u) => u.trim()).filter(Boolean)
+          : [(body.inputValue ?? "").trim()].filter(Boolean);
+      if (urls.length === 0) {
+        return NextResponse.json({ error: "URL required" }, { status: 400 });
+      }
+      inputTypeForDb = "url";
+      inputValueForDb = urls.join("\n");
+
+      const pageResults: Array<{ inputValue: string; result: AnalysisAiResponse }> = [];
+      for (const url of urls) {
+        const result = await analyzeOne([
+          {
+            type: "text",
+            text: `Please audit this website/staging URL for UX and UI quality: ${url}`,
+          },
+        ]);
+        pageResults.push({ inputValue: url, result });
+      }
+
+      if (pageResults.length === 1) {
+        aiPayload = pageResults[0].result;
+        score = Math.round(pageResults[0].result.overall_score);
+      } else {
+        const combined = buildCombinedSummary(pageResults);
+        aiPayload = combined;
+        score = Math.round(combined.overall_score);
+      }
     }
-
-    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    console.log("[api/analyze] calling Claude");
-
-    const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 4000,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: userContent }],
-    });
-
-    const rawText = textFromMessage(message.content);
-    console.log("[api/analyze] raw Claude response", rawText);
-    const cleanedText = stripMarkdownJsonFence(rawText);
-    console.log("[api/analyze] Claude response length", cleanedText.length);
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(cleanedText);
-    } catch (e) {
-      console.error("[api/analyze] JSON.parse failed", e);
-      console.error("[api/analyze] raw Claude response", rawText);
-      return NextResponse.json(
-        { error: "Model returned invalid JSON", detail: rawText.slice(0, 400) },
-        { status: 502 },
-      );
-    }
-
-    if (!isAnalysisAiResponse(parsed)) {
-      console.error("[api/analyze] schema mismatch", parsed);
-      return NextResponse.json(
-        { error: "Model JSON did not match expected schema" },
-        { status: 502 },
-      );
-    }
-
-    const aiResponse = parsed;
-    const score = Math.round(aiResponse.overall_score);
 
     const { data: row, error: insertError } = await supabase
       .from("analyses")
       .insert({
         user_id: user.id,
-        input_type: inputType,
+        input_type: inputTypeForDb,
         input_value: inputValueForDb,
-        ai_response: aiResponse as unknown as Record<string, unknown>,
+        ai_response: aiPayload as unknown as Record<string, unknown>,
         score,
       })
       .select("id")
@@ -261,10 +348,18 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       analysisId: row.id,
-      result: aiResponse,
+      result: aiPayload,
     });
   } catch (err) {
     console.error("[api/analyze] unhandled", err);
+    if (err instanceof Error) {
+      if (err.message === "Model returned invalid JSON") {
+        return NextResponse.json({ error: err.message }, { status: 502 });
+      }
+      if (err.message === "Model JSON did not match expected schema") {
+        return NextResponse.json({ error: err.message }, { status: 502 });
+      }
+    }
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 },

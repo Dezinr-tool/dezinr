@@ -4,12 +4,13 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-type Tab = "url" | "screenshot";
+type Tab = "url" | "screenshot" | "figma";
 
 export default function AnalyzePage() {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("url");
-  const [url, setUrl] = useState("");
+  const [urls, setUrls] = useState<string[]>([""]);
+  const [figmaUrl, setFigmaUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,12 +51,34 @@ export default function AnalyzePage() {
 
   async function onAnalyzeUrl(e: React.FormEvent) {
     e.preventDefault();
-    const u = url.trim();
-    if (!u) {
+    const sanitized = urls.map((u) => u.trim()).filter(Boolean);
+    if (sanitized.length === 0) {
       setError("Enter a URL");
       return;
     }
-    await runAnalyze({ inputType: "url", inputValue: u });
+    if (sanitized.length === 1) {
+      await runAnalyze({ inputType: "url", inputValue: sanitized[0] });
+      return;
+    }
+    await runAnalyze({ inputType: "url", inputValues: sanitized });
+  }
+
+  async function onAnalyzeFigma(e: React.FormEvent) {
+    e.preventDefault();
+    const u = figmaUrl.trim();
+    if (!u) {
+      setError("Enter a Figma URL");
+      return;
+    }
+    await runAnalyze({ inputType: "figma", inputValue: u });
+  }
+
+  function updateUrlAt(index: number, value: string) {
+    setUrls((prev) => prev.map((u, i) => (i === index ? value : u)));
+  }
+
+  function addAnotherPage() {
+    setUrls((prev) => (prev.length < 5 ? [...prev, ""] : prev));
   }
 
   async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -120,20 +143,41 @@ export default function AnalyzePage() {
         >
           Screenshot
         </button>
+        <button
+          type="button"
+          className={`rounded-md border px-3 py-1.5 text-sm ${
+            tab === "figma"
+              ? "border-foreground bg-foreground text-background"
+              : "border-zinc-300 dark:border-zinc-600"
+          }`}
+          onClick={() => setTab("figma")}
+        >
+          Figma
+        </button>
       </div>
 
       {tab === "url" ? (
         <form onSubmit={onAnalyzeUrl} className="mt-6 flex flex-col gap-4">
-          <label className="flex flex-col gap-1 text-sm">
-            Website or staging URL
-            <input
-              type="url"
-              placeholder="https://…"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              className="rounded-md border border-zinc-300 bg-background px-3 py-2 dark:border-zinc-600"
-            />
-          </label>
+          {urls.map((url, index) => (
+            <label key={index} className="flex flex-col gap-1 text-sm">
+              {index === 0 ? "Website or staging URL" : `Page ${index + 1} URL`}
+              <input
+                type="url"
+                placeholder="https://…"
+                value={url}
+                onChange={(e) => updateUrlAt(index, e.target.value)}
+                className="rounded-md border border-zinc-300 bg-background px-3 py-2 dark:border-zinc-600"
+              />
+            </label>
+          ))}
+          <button
+            type="button"
+            onClick={addAnotherPage}
+            disabled={urls.length >= 5 || loading}
+            className="w-fit rounded-md border border-zinc-300 px-3 py-1.5 text-xs dark:border-zinc-600 disabled:opacity-50"
+          >
+            + Add another page
+          </button>
           {error ? (
             <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
           ) : null}
@@ -145,7 +189,7 @@ export default function AnalyzePage() {
             {loading ? "Auditing..." : "Start audit"}
           </button>
         </form>
-      ) : (
+      ) : tab === "screenshot" ? (
         <div className="mt-6 flex flex-col gap-4">
           <label className="flex flex-col gap-1 text-sm">
             Upload screenshot
@@ -169,6 +213,29 @@ export default function AnalyzePage() {
             </p>
           ) : null}
         </div>
+      ) : (
+        <form onSubmit={onAnalyzeFigma} className="mt-6 flex flex-col gap-4">
+          <label className="flex flex-col gap-1 text-sm">
+            Figma file URL
+            <input
+              type="url"
+              placeholder="https://www.figma.com/file/..."
+              value={figmaUrl}
+              onChange={(e) => setFigmaUrl(e.target.value)}
+              className="rounded-md border border-zinc-300 bg-background px-3 py-2 dark:border-zinc-600"
+            />
+          </label>
+          {error ? (
+            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+          ) : null}
+          <button
+            type="submit"
+            disabled={loading}
+            className="rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background disabled:opacity-50"
+          >
+            {loading ? "Auditing..." : "Start audit"}
+          </button>
+        </form>
       )}
     </div>
   );
