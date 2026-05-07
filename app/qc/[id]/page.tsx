@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { QcComment } from "@/lib/qc-types";
 import { ReviewClient } from "./review-client";
@@ -20,17 +20,32 @@ export default async function QcReviewPage({
   const { data: review, error } = await supabase
     .from("qc_reviews")
     .select(
-      "id, project_name, figma_url, staging_url, total_issues, must_fix_count, minor_count, suggestion_count, comments, created_at",
+      "id, project_name, figma_url, staging_url, total_issues, must_fix_count, minor_count, suggestion_count, ai_comments, created_at",
     )
     .eq("id", id)
     .eq("user_id", user.id)
-    .single();
+    .maybeSingle();
 
   if (error || !review) {
-    notFound();
+    return (
+      <div className="mx-auto max-w-3xl px-4 py-10">
+        <div className="rounded-xl border border-zinc-200 p-6 dark:border-zinc-800">
+          <h1 className="text-xl font-semibold">Review not found</h1>
+          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+            The requested QC review could not be found.
+          </p>
+          <Link
+            href="/qc"
+            className="mt-4 inline-block rounded-md bg-foreground px-3 py-1.5 text-sm text-background"
+          >
+            Back to Design QC
+          </Link>
+        </div>
+      </div>
+    );
   }
 
-  const comments = (review.comments as unknown as QcComment[]) ?? [];
+  const comments = (review.ai_comments as unknown as QcComment[]) ?? [];
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
