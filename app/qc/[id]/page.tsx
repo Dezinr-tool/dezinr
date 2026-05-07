@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { QcComment } from "@/lib/qc-types";
-import { ReviewClient } from "./review-client";
+import { ReviewWorkspace } from "./review-workspace";
 
 export default async function QcReviewPage({
   params,
@@ -104,7 +104,11 @@ export default async function QcReviewPage({
         </div>
       </section>
 
-      <ReviewClient reviewId={review.id} comments={comments} />
+      <ReviewWorkspace
+        reviewId={review.id}
+        comments={comments}
+        stagingUrl={review.staging_url}
+      />
     </div>
   );
 }
