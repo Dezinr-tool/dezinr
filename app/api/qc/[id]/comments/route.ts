@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import type { QcComment, QcStatus } from "@/lib/qc-types";
+import type { QcComment, QcPriority } from "@/lib/qc-types";
 
-export async function PATCH(
+export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -18,19 +18,26 @@ export async function PATCH(
     }
 
     const body = (await request.json()) as {
-      commentId?: number;
-      status?: QcStatus;
+      section?: string;
+      priority?: QcPriority;
+      issue?: string;
+      fix?: string;
     };
 
-    if (
-      typeof body.commentId !== "number" ||
-      !body.status ||
-      !["open", "in_progress", "resolved"].includes(body.status)
-    ) {
+    const section = body.section?.trim();
+    const issue = body.issue?.trim();
+    const fix = body.fix?.trim();
+    const priority = body.priority;
+
+    if (!section || !issue || !fix || !priority) {
       return NextResponse.json(
-        { error: "commentId and valid status are required" },
+        { error: "section, priority, issue, and fix are required" },
         { status: 400 },
       );
+    }
+
+    if (!["must_fix", "minor", "suggestion"].includes(priority)) {
+      return NextResponse.json({ error: "Invalid priority" }, { status: 400 });
     }
 
     const { data: review, error: loadError } = await supabase
@@ -45,9 +52,20 @@ export async function PATCH(
     }
 
     const comments = (review.ai_comments as unknown as QcComment[]) ?? [];
-    const next = comments.map((comment) =>
-      comment.id === body.commentId ? { ...comment, status: body.status! } : comment,
-    );
+    const nextId = comments.reduce((maxId, comment) => Math.max(maxId, comment.id), 0) + 1;
+
+    const manualComment: QcComment = {
+      id: nextId,
+      section,
+      issue,
+      figma_reference: "Manual reviewer note",
+      fix,
+      priority,
+      status: "open",
+      is_manual: true,
+    };
+
+    const next = [...comments, manualComment];
 
     const { error: updateError } = await supabase
       .from("qc_reviews")
@@ -57,14 +75,14 @@ export async function PATCH(
 
     if (updateError) {
       return NextResponse.json(
-        { error: "Failed to update status", detail: updateError.message },
+        { error: "Failed to add comment", detail: updateError.message },
         { status: 500 },
       );
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, comment: manualComment });
   } catch (err) {
-    console.error("[api/qc/:id/status] unhandled", err);
+    console.error("[api/qc/:id/comments] unhandled", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

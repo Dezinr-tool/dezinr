@@ -9,6 +9,7 @@ export type QcComment = {
   fix: string;
   priority: QcPriority;
   status: QcStatus;
+  is_manual?: boolean;
 };
 
 export type QcReviewPayload = {

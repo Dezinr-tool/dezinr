@@ -31,6 +31,13 @@ function priorityLabel(priority: QcPriority) {
 export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComments }: Props) {
   const [comments, setComments] = useState(initialComments);
   const [filter, setFilter] = useState<Filter>("all");
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newSection, setNewSection] = useState("Hero");
+  const [newPriority, setNewPriority] = useState<QcPriority>("must_fix");
+  const [newIssue, setNewIssue] = useState("");
+  const [newFix, setNewFix] = useState("");
+  const [addError, setAddError] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
   const [viewportMode, setViewportMode] = useState<ViewportMode>("desktop");
   const [desktopScale, setDesktopScale] = useState(0.65);
   const [savingId, setSavingId] = useState<number | null>(null);
@@ -64,6 +71,40 @@ export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComment
       );
     } finally {
       setSavingId(null);
+    }
+  }
+
+  async function addManualComment(e: React.FormEvent) {
+    e.preventDefault();
+    setAddError(null);
+    setAdding(true);
+    try {
+      const res = await fetch(`/api/qc/${reviewId}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          section: newSection,
+          priority: newPriority,
+          issue: newIssue.trim(),
+          fix: newFix.trim(),
+        }),
+      });
+      const json = (await res.json()) as { error?: string; comment?: QcComment };
+      if (!res.ok || !json.comment) {
+        setAddError(json.error ?? "Could not add comment");
+        return;
+      }
+      setComments((prev) => [...prev, json.comment!]);
+      setShowAddForm(false);
+      setNewIssue("");
+      setNewFix("");
+      setNewSection("Hero");
+      setNewPriority("must_fix");
+    } catch {
+      setAddError("Network error");
+    } finally {
+      setAdding(false);
     }
   }
 
@@ -105,7 +146,7 @@ export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComment
   return (
     <div className="mt-6 grid gap-4 lg:grid-cols-[35%_65%]">
       <section className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {[
             { id: "all", label: "All" },
             { id: "must_fix", label: "Must Fix" },
@@ -125,7 +166,77 @@ export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComment
               {item.label}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={() => setShowAddForm((v) => !v)}
+            className="ml-auto rounded-md border border-zinc-300 px-3 py-1.5 text-sm dark:border-zinc-600"
+          >
+            Add Comment
+          </button>
         </div>
+
+        {showAddForm ? (
+          <form onSubmit={addManualComment} className="mt-3 rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">
+            <div className="grid gap-3">
+              <label className="flex flex-col gap-1 text-xs">
+                Section
+                <select
+                  value={newSection}
+                  onChange={(e) => setNewSection(e.target.value)}
+                  className="rounded-md border border-zinc-300 bg-background px-2 py-1.5 text-sm dark:border-zinc-600"
+                >
+                  {["Hero", "Navigation", "Footer", "Cards", "CTA", "Typography", "Colors", "Spacing", "Other"].map(
+                    (section) => (
+                      <option key={section} value={section}>
+                        {section}
+                      </option>
+                    ),
+                  )}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 text-xs">
+                Priority
+                <select
+                  value={newPriority}
+                  onChange={(e) => setNewPriority(e.target.value as QcPriority)}
+                  className="rounded-md border border-zinc-300 bg-background px-2 py-1.5 text-sm dark:border-zinc-600"
+                >
+                  <option value="must_fix">Must Fix</option>
+                  <option value="minor">Minor</option>
+                  <option value="suggestion">Suggestion</option>
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 text-xs">
+                What is wrong?
+                <textarea
+                  value={newIssue}
+                  onChange={(e) => setNewIssue(e.target.value)}
+                  rows={3}
+                  className="rounded-md border border-zinc-300 bg-background px-2 py-1.5 text-sm dark:border-zinc-600"
+                  required
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs">
+                How to fix it?
+                <textarea
+                  value={newFix}
+                  onChange={(e) => setNewFix(e.target.value)}
+                  rows={3}
+                  className="rounded-md border border-zinc-300 bg-background px-2 py-1.5 text-sm dark:border-zinc-600"
+                  required
+                />
+              </label>
+            </div>
+            {addError ? <p className="mt-2 text-xs text-red-600 dark:text-red-400">{addError}</p> : null}
+            <button
+              type="submit"
+              disabled={adding}
+              className="mt-3 rounded-md bg-foreground px-3 py-1.5 text-sm text-background disabled:opacity-50"
+            >
+              {adding ? "Adding..." : "Add Comment"}
+            </button>
+          </form>
+        ) : null}
 
         <div className="mt-4 grid max-h-[70vh] gap-3 overflow-y-auto pr-1">
           {filtered.map((comment, index) => (
@@ -150,6 +261,11 @@ export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComment
                 >
                   {priorityLabel(comment.priority)}
                 </span>
+                {comment.is_manual ? (
+                  <span className="rounded-full border border-zinc-300 px-2.5 py-1 text-xs font-medium text-zinc-600 dark:border-zinc-600 dark:text-zinc-300">
+                    Manual
+                  </span>
+                ) : null}
               </div>
 
               <p className="mt-2 text-sm font-semibold">{comment.issue}</p>
