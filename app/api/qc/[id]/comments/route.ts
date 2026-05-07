@@ -72,10 +72,20 @@ export async function POST(
     };
 
     const next = [...comments, manualComment];
+    const nextTotal = next.length;
+    const nextMustFix = next.filter((comment) => comment.priority === "must_fix").length;
+    const nextMinor = next.filter((comment) => comment.priority === "minor").length;
+    const nextSuggestion = next.filter((comment) => comment.priority === "suggestion").length;
 
     const { error: updateError } = await supabase
       .from("qc_reviews")
-      .update({ ai_comments: next as unknown as Record<string, unknown>[] })
+      .update({
+        ai_comments: next as unknown as Record<string, unknown>[],
+        total_issues: nextTotal,
+        must_fix_count: nextMustFix,
+        minor_count: nextMinor,
+        suggestion_count: nextSuggestion,
+      })
       .eq("id", id)
       .eq("user_id", user.id);
 

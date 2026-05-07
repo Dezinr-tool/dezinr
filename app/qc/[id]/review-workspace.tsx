@@ -60,6 +60,14 @@ export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComment
     return comments.filter((c) => c.priority === filter);
   }, [comments, filter]);
 
+  const counts = useMemo(() => {
+    const total_issues = comments.length;
+    const must_fix_count = comments.filter((comment) => comment.priority === "must_fix").length;
+    const minor_count = comments.filter((comment) => comment.priority === "minor").length;
+    const suggestion_count = comments.filter((comment) => comment.priority === "suggestion").length;
+    return { total_issues, must_fix_count, minor_count, suggestion_count };
+  }, [comments]);
+
   async function updateStatus(commentId: number, status: QcStatus) {
     setSavingId(commentId);
     try {
@@ -214,7 +222,33 @@ export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComment
   }
 
   return (
-    <div className="mt-6 grid gap-4 lg:grid-cols-[35%_65%]">
+    <div className="mt-6 space-y-4">
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
+          <p className="text-xs text-zinc-500">Total Issues</p>
+          <p className="mt-1 text-2xl font-semibold">{counts.total_issues}</p>
+        </div>
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950/30">
+          <p className="text-xs text-red-700 dark:text-red-200">Must Fix</p>
+          <p className="mt-1 text-2xl font-semibold text-red-900 dark:text-red-100">
+            {counts.must_fix_count}
+          </p>
+        </div>
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/30">
+          <p className="text-xs text-amber-700 dark:text-amber-200">Minor</p>
+          <p className="mt-1 text-2xl font-semibold text-amber-900 dark:text-amber-100">
+            {counts.minor_count}
+          </p>
+        </div>
+        <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950/30">
+          <p className="text-xs text-blue-700 dark:text-blue-200">Suggestions</p>
+          <p className="mt-1 text-2xl font-semibold text-blue-900 dark:text-blue-100">
+            {counts.suggestion_count}
+          </p>
+        </div>
+      </section>
+
+      <div className="grid gap-4 lg:grid-cols-[35%_65%]">
       <section className="rounded-xl border border-zinc-200 p-4 dark:border-zinc-800">
         <div className="flex flex-wrap items-center gap-2">
           {[
@@ -543,6 +577,7 @@ export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComment
           </div>
         </div>
       </section>
+      </div>
     </div>
   );
 }
