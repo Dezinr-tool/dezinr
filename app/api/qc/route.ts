@@ -18,14 +18,17 @@ Use exactly this structure:
       "section": "Hero",
       "issue": "what is wrong",
       "figma_reference": "how it should look",
-      "fix": "exact CSS fix",
+      "fix": "plain English instruction for developer, no CSS code, no quotes — just describe what to change",
       "priority": "must_fix",
       "status": "open"
     }
   ]
 }
 
-IMPORTANT: Use double quotes for all JSON keys and string values. Never use single quotes.`;
+IMPORTANT: Use double quotes for all JSON keys and string values. Never use single quotes.
+Return maximum 10 comments.
+Keep all text values simple — no CSS, no code,
+no special characters in any field value.`;
 
 function textFromMessage(content: Anthropic.Message["content"]): string {
   return content
@@ -83,7 +86,6 @@ export async function POST(request: Request) {
     const clean = rawText
       .replace(/```json/g, "")
       .replace(/```/g, "")
-      .replace(/'/g, "\"")
       .trim();
     let parsed: unknown;
     try {
