@@ -10,6 +10,8 @@ export type QcComment = {
   priority: QcPriority;
   status: QcStatus;
   is_manual?: boolean;
+  x_percent?: number;
+  y_percent?: number;
 };
 
 export type QcReviewPayload = {

@@ -22,16 +22,20 @@ export async function POST(
       priority?: QcPriority;
       issue?: string;
       fix?: string;
+      x_percent?: number;
+      y_percent?: number;
     };
 
-    const section = body.section?.trim();
+    const section = body.section?.trim() || "Other";
     const issue = body.issue?.trim();
-    const fix = body.fix?.trim();
+    const fix = body.fix?.trim() || "Manual reviewer note";
     const priority = body.priority;
+    const xPercent = typeof body.x_percent === "number" ? body.x_percent : undefined;
+    const yPercent = typeof body.y_percent === "number" ? body.y_percent : undefined;
 
-    if (!section || !issue || !fix || !priority) {
+    if (!issue || !priority) {
       return NextResponse.json(
-        { error: "section, priority, issue, and fix are required" },
+        { error: "priority and issue are required" },
         { status: 400 },
       );
     }
@@ -63,6 +67,8 @@ export async function POST(
       priority,
       status: "open",
       is_manual: true,
+      x_percent: xPercent,
+      y_percent: yPercent,
     };
 
     const next = [...comments, manualComment];

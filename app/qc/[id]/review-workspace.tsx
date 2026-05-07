@@ -43,7 +43,13 @@ export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComment
   const [savingId, setSavingId] = useState<number | null>(null);
   const [activeCommentId, setActiveCommentId] = useState<number | null>(null);
   const [iframeError, setIframeError] = useState(false);
+  const [popup, setPopup] = useState<{ x: number; y: number } | null>(null);
+  const [popupIssue, setPopupIssue] = useState("");
+  const [popupPriority, setPopupPriority] = useState<QcPriority>("must_fix");
+  const [popupSaving, setPopupSaving] = useState(false);
+  const [popupError, setPopupError] = useState<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const previewClickLayerRef = useRef<HTMLDivElement | null>(null);
   const previewCanvasHeight = 2000;
   const frameWidth = viewportMode === "desktop" ? 1280 : 390;
   const scale = viewportMode === "desktop" ? desktopScale : 1;
@@ -109,6 +115,15 @@ export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComment
   }
 
   function getPinPosition(comment: QcComment, index: number, total: number) {
+    if (
+      typeof comment.x_percent === "number" &&
+      typeof comment.y_percent === "number"
+    ) {
+      return {
+        top: `${Math.max(0, Math.min(100, comment.y_percent))}%`,
+        left: `${Math.max(0, Math.min(100, comment.x_percent))}%`,
+      };
+    }
     const section = comment.section.toLowerCase();
     if (section.includes("navigation") || section.includes("nav")) {
       return { top: "3%", left: "50%" };
@@ -141,6 +156,61 @@ export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComment
     if (Number.isNaN(topPercent)) return;
     const target = (topPercent / 100) * previewCanvasHeight * scale - 120;
     scrollContainerRef.current?.scrollTo({ top: Math.max(0, target), behavior: "smooth" });
+  }
+
+  function onPreviewClick(e: React.MouseEvent<HTMLDivElement>) {
+    const rect = previewClickLayerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    setPopup({ x, y });
+    setPopupIssue("");
+    setPopupPriority("must_fix");
+    setPopupError(null);
+  }
+
+  function closePopup() {
+    setPopup(null);
+    setPopupIssue("");
+    setPopupError(null);
+  }
+
+  async function savePopupComment() {
+    if (!popup) return;
+    const issue = popupIssue.trim();
+    if (!issue) {
+      setPopupError("Issue is required");
+      return;
+    }
+    setPopupSaving(true);
+    setPopupError(null);
+    try {
+      const res = await fetch(`/api/qc/${reviewId}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          section: "Other",
+          priority: popupPriority,
+          issue,
+          fix: "Manual reviewer note",
+          x_percent: popup.x,
+          y_percent: popup.y,
+        }),
+      });
+      const json = (await res.json()) as { error?: string; comment?: QcComment };
+      if (!res.ok || !json.comment) {
+        setPopupError(json.error ?? "Could not add comment");
+        return;
+      }
+      setComments((prev) => [...prev, json.comment]);
+      setPopup(null);
+      setPopupIssue("");
+    } catch {
+      setPopupError("Network error");
+    } finally {
+      setPopupSaving(false);
+    }
   }
 
   return (
@@ -409,6 +479,65 @@ export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComment
                     </button>
                   );
                 })}
+
+                <div
+                  ref={previewClickLayerRef}
+                  onClick={onPreviewClick}
+                  className="absolute inset-0 z-20 cursor-crosshair"
+                />
+
+                {popup ? (
+                  <div
+                    style={{
+                      position: "absolute",
+                      left: `${popup.x}%`,
+                      top: `${popup.y}%`,
+                      zIndex: 1000,
+                      background: "white",
+                      borderRadius: "8px",
+                      padding: "12px",
+                      boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
+                      width: "240px",
+                    }}
+                    className="-translate-x-1/2 -translate-y-1/2 border border-zinc-200 text-zinc-900"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <textarea
+                      value={popupIssue}
+                      onChange={(e) => setPopupIssue(e.target.value)}
+                      placeholder="What is the issue?"
+                      className="w-full rounded-md border border-zinc-300 px-2 py-1 text-sm"
+                      rows={3}
+                    />
+                    <select
+                      value={popupPriority}
+                      onChange={(e) => setPopupPriority(e.target.value as QcPriority)}
+                      className="mt-2 w-full rounded-md border border-zinc-300 px-2 py-1 text-sm"
+                    >
+                      <option value="must_fix">Must Fix</option>
+                      <option value="minor">Minor</option>
+                      <option value="suggestion">Suggestion</option>
+                    </select>
+                    {popupError ? <p className="mt-2 text-xs text-red-600">{popupError}</p> : null}
+                    <div style={{ display: "flex", gap: "8px" }} className="mt-2">
+                      <button
+                        type="button"
+                        onClick={savePopupComment}
+                        disabled={popupSaving}
+                        className="rounded-md bg-foreground px-2 py-1 text-sm text-background disabled:opacity-50"
+                      >
+                        {popupSaving ? "Adding..." : "Add"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={closePopup}
+                        className="rounded-md border border-zinc-300 px-2 py-1 text-sm"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>
