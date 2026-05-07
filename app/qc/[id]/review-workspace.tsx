@@ -32,15 +32,17 @@ export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComment
   const [filter, setFilter] = useState<Filter>("all");
   const [savingId, setSavingId] = useState<number | null>(null);
   const [activeCommentId, setActiveCommentId] = useState<number | null>(null);
+  const [imageLoading, setImageLoading] = useState(true);
+  const [imageError, setImageError] = useState(false);
 
   const filtered = useMemo(() => {
     if (filter === "all") return comments;
     return comments.filter((c) => c.priority === filter);
   }, [comments, filter]);
 
-  const screenshotUrl = `https://image.thum.io/get/width/1440/crop/900/${encodeURIComponent(
+  const screenshotUrl = `https://api.microlink.io/?url=${encodeURIComponent(
     stagingUrl,
-  )}`;
+  )}&screenshot=true&meta=false&embed=screenshot.url`;
 
   async function updateStatus(commentId: number, status: QcStatus) {
     setSavingId(commentId);
@@ -162,12 +164,44 @@ export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComment
       </section>
 
       <section className="rounded-xl border border-zinc-200 p-2 dark:border-zinc-800">
-        <div className="relative overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-800">
-          <img
-            src={screenshotUrl}
-            alt="Staging preview screenshot"
-            className="h-auto w-full"
-          />
+        <div className="relative min-h-[520px] overflow-hidden rounded-md border border-zinc-200 bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900">
+          {imageLoading ? (
+            <div className="absolute inset-0 flex items-center justify-center text-sm text-zinc-600 dark:text-zinc-300">
+              Loading staging preview...
+            </div>
+          ) : null}
+
+          {imageError ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-zinc-200/80 px-4 text-center dark:bg-zinc-900/80">
+              <p className="text-sm font-medium">Preview unavailable</p>
+              <p className="max-w-xl break-all text-xs text-zinc-600 dark:text-zinc-300">
+                {stagingUrl}
+              </p>
+              <a
+                href={stagingUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-md bg-foreground px-3 py-1.5 text-sm text-background"
+              >
+                Open Staging
+              </a>
+            </div>
+          ) : (
+            <img
+              src={screenshotUrl}
+              alt="Staging preview screenshot"
+              onLoad={() => {
+                setImageLoading(false);
+                setImageError(false);
+              }}
+              onError={() => {
+                setImageLoading(false);
+                setImageError(true);
+              }}
+              className={`h-auto w-full ${imageLoading ? "opacity-0" : "opacity-100"}`}
+            />
+          )}
+
           {comments.map((comment, index) => {
             const pos = getPinPosition(comment, index, comments.length);
             return (
