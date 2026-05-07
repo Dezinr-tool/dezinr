@@ -40,7 +40,6 @@ export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComment
   const previewCanvasHeight = 2000;
   const frameWidth = viewportMode === "desktop" ? 1280 : 390;
   const scale = viewportMode === "desktop" ? desktopScale : 1;
-  const scaledFrameWidth = frameWidth * scale;
   const scaledFrameHeight = previewCanvasHeight * scale;
 
   const filtered = useMemo(() => {
@@ -230,9 +229,9 @@ export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComment
             className="h-[70vh] overflow-y-auto bg-zinc-100 dark:bg-zinc-900"
           >
             <div
-              className="relative mx-auto"
+              className={`relative ${viewportMode === "mobile" ? "mx-auto" : ""}`}
               style={{
-                width: `${scaledFrameWidth}px`,
+                width: viewportMode === "desktop" ? "100%" : `${frameWidth}px`,
                 minHeight: `${scaledFrameHeight}px`,
               }}
             >
