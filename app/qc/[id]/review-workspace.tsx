@@ -32,11 +32,16 @@ export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComment
   const [comments, setComments] = useState(initialComments);
   const [filter, setFilter] = useState<Filter>("all");
   const [viewportMode, setViewportMode] = useState<ViewportMode>("desktop");
+  const [desktopScale, setDesktopScale] = useState(0.65);
   const [savingId, setSavingId] = useState<number | null>(null);
   const [activeCommentId, setActiveCommentId] = useState<number | null>(null);
   const [iframeError, setIframeError] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const previewCanvasHeight = 2000;
+  const frameWidth = viewportMode === "desktop" ? 1280 : 390;
+  const scale = viewportMode === "desktop" ? desktopScale : 1;
+  const scaledFrameWidth = frameWidth * scale;
+  const scaledFrameHeight = previewCanvasHeight * scale;
 
   const filtered = useMemo(() => {
     if (filter === "all") return comments;
@@ -94,7 +99,7 @@ export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComment
     const pos = getPinPosition(comments[idx], idx, comments.length);
     const topPercent = Number.parseFloat(pos.top);
     if (Number.isNaN(topPercent)) return;
-    const target = (topPercent / 100) * previewCanvasHeight - 120;
+    const target = (topPercent / 100) * previewCanvasHeight * scale - 120;
     scrollContainerRef.current?.scrollTo({ top: Math.max(0, target), behavior: "smooth" });
   }
 
@@ -193,6 +198,25 @@ export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComment
           >
             Mobile
           </button>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setDesktopScale((prev) => Math.max(0.4, Number((prev - 0.05).toFixed(2))))}
+              disabled={viewportMode !== "desktop" || desktopScale <= 0.4}
+              className="rounded-md border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-600 disabled:opacity-50"
+            >
+              -
+            </button>
+            <span className="text-xs text-zinc-500">{Math.round(scale * 100)}%</span>
+            <button
+              type="button"
+              onClick={() => setDesktopScale((prev) => Math.min(1, Number((prev + 0.05).toFixed(2))))}
+              disabled={viewportMode !== "desktop" || desktopScale >= 1}
+              className="rounded-md border border-zinc-300 px-2 py-1 text-sm dark:border-zinc-600 disabled:opacity-50"
+            >
+              +
+            </button>
+          </div>
         </div>
         <div className="overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-800">
           <div className="border-b border-zinc-300 bg-zinc-200 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-800">
@@ -208,54 +232,69 @@ export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComment
             <div
               className="relative mx-auto"
               style={{
-                minHeight: `${previewCanvasHeight}px`,
-                width: viewportMode === "mobile" ? "390px" : "100%",
+                width: `${scaledFrameWidth}px`,
+                minHeight: `${scaledFrameHeight}px`,
               }}
             >
-            {iframeError ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-zinc-200/80 px-4 text-center dark:bg-zinc-900/80">
-                <p className="text-sm font-medium">Preview blocked by site security</p>
-                <a
-                  href={stagingUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rounded-md bg-foreground px-3 py-1.5 text-sm text-background"
-                >
-                  Open Staging
-                </a>
-              </div>
-            ) : (
-              <iframe
-                src={stagingUrl}
-                sandbox="allow-scripts allow-same-origin"
-                style={{ width: "100%", height: `${previewCanvasHeight}px`, border: "none" }}
-                onError={() => setIframeError(true)}
-                onLoad={() => setIframeError(false)}
-                title="Staging preview"
-              />
-            )}
+              <div
+                className="absolute left-0 top-0"
+                style={{
+                  width: `${frameWidth}px`,
+                  minHeight: `${previewCanvasHeight}px`,
+                  transform: `scale(${scale})`,
+                  transformOrigin: "top left",
+                }}
+              >
+                {iframeError ? (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-zinc-200/80 px-4 text-center dark:bg-zinc-900/80">
+                    <p className="text-sm font-medium">Preview blocked by site security</p>
+                    <a
+                      href={stagingUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-md bg-foreground px-3 py-1.5 text-sm text-background"
+                    >
+                      Open Staging
+                    </a>
+                  </div>
+                ) : (
+                  <iframe
+                    src={stagingUrl}
+                    sandbox="allow-scripts allow-same-origin"
+                    style={{
+                      width: `${frameWidth}px`,
+                      minWidth: viewportMode === "desktop" ? "1280px" : "390px",
+                      height: `${previewCanvasHeight}px`,
+                      border: "none",
+                    }}
+                    onError={() => setIframeError(true)}
+                    onLoad={() => setIframeError(false)}
+                    title="Staging preview"
+                  />
+                )}
 
-            {comments.map((comment, index) => {
-              const pos = getPinPosition(comment, index, comments.length);
-              return (
-                <button
-                  key={comment.id}
-                  type="button"
-                  onClick={() => highlightComment(comment.id)}
-                  title={`${comment.section}: ${comment.issue}`}
-                  className={`absolute flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-xs font-bold text-white shadow ${
-                    comment.priority === "must_fix"
-                      ? "bg-red-600"
-                      : comment.priority === "minor"
-                        ? "bg-amber-600"
-                        : "bg-blue-600"
-                  } ${activeCommentId === comment.id ? "ring-4 ring-black/70" : ""}`}
-                  style={{ top: pos.top, left: pos.left }}
-                >
-                  {index + 1}
-                </button>
-              );
-            })}
+                {comments.map((comment, index) => {
+                  const pos = getPinPosition(comment, index, comments.length);
+                  return (
+                    <button
+                      key={comment.id}
+                      type="button"
+                      onClick={() => highlightComment(comment.id)}
+                      title={`${comment.section}: ${comment.issue}`}
+                      className={`absolute flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-xs font-bold text-white shadow ${
+                        comment.priority === "must_fix"
+                          ? "bg-red-600"
+                          : comment.priority === "minor"
+                            ? "bg-amber-600"
+                            : "bg-blue-600"
+                      } ${activeCommentId === comment.id ? "ring-4 ring-black/70" : ""}`}
+                      style={{ top: pos.top, left: pos.left }}
+                    >
+                      {index + 1}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
