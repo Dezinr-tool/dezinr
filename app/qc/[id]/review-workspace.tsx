@@ -32,15 +32,12 @@ export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComment
   const [filter, setFilter] = useState<Filter>("all");
   const [savingId, setSavingId] = useState<number | null>(null);
   const [activeCommentId, setActiveCommentId] = useState<number | null>(null);
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const [imageError, setImageError] = useState(false);
+  const [iframeError, setIframeError] = useState(false);
 
   const filtered = useMemo(() => {
     if (filter === "all") return comments;
     return comments.filter((c) => c.priority === filter);
   }, [comments, filter]);
-
-  const screenshotUrl = `https://image.thum.io/get/width/1440/crop/900/${stagingUrl}`;
 
   async function updateStatus(commentId: number, status: QcStatus) {
     setSavingId(commentId);
@@ -162,68 +159,59 @@ export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComment
       </section>
 
       <section className="rounded-xl border border-zinc-200 p-2 dark:border-zinc-800">
-        <div className="relative min-h-[520px] overflow-hidden rounded-md border border-zinc-200 bg-zinc-100 dark:border-zinc-800 dark:bg-zinc-900">
-          {!imageLoaded && !imageError ? (
-            <div className="absolute inset-0 flex items-center justify-center text-sm text-zinc-600 dark:text-zinc-300">
-              Loading staging preview...
-            </div>
-          ) : null}
+        <div className="overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-800">
+          <div className="border-b border-zinc-300 bg-zinc-200 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-800">
+            <p className="truncate text-xs text-zinc-700 dark:text-zinc-200">
+              {stagingUrl}
+            </p>
+          </div>
 
-          {imageError ? (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-zinc-200/80 px-4 text-center dark:bg-zinc-900/80">
-              <p className="text-sm font-medium">Preview unavailable</p>
-              <p className="max-w-xl break-all text-xs text-zinc-600 dark:text-zinc-300">
-                {stagingUrl}
-              </p>
-              <a
-                href={stagingUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="rounded-md bg-foreground px-3 py-1.5 text-sm text-background"
-              >
-                Open Staging Site
-              </a>
-              <p className="max-w-xl text-xs text-zinc-600 dark:text-zinc-300">
-                View staging site directly and refer to numbered issues on left
-              </p>
-            </div>
-          ) : (
-            <img
-              src={screenshotUrl}
-              alt="Staging preview"
-              onLoad={() => {
-                setImageLoaded(true);
-                setImageError(false);
-              }}
-              onError={() => {
-                setImageLoaded(false);
-                setImageError(true);
-              }}
-              style={{ width: "100%", height: "auto" }}
-            />
-          )}
+          <div className="relative min-h-[600px] bg-zinc-100 dark:bg-zinc-900">
+            {iframeError ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-zinc-200/80 px-4 text-center dark:bg-zinc-900/80">
+                <p className="text-sm font-medium">Preview blocked by site security</p>
+                <a
+                  href={stagingUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-md bg-foreground px-3 py-1.5 text-sm text-background"
+                >
+                  Open Staging
+                </a>
+              </div>
+            ) : (
+              <iframe
+                src={stagingUrl}
+                sandbox="allow-scripts allow-same-origin"
+                style={{ width: "100%", height: "600px", border: "none" }}
+                onError={() => setIframeError(true)}
+                onLoad={() => setIframeError(false)}
+                title="Staging preview"
+              />
+            )}
 
-          {comments.map((comment, index) => {
-            const pos = getPinPosition(comment, index, comments.length);
-            return (
-              <button
-                key={comment.id}
-                type="button"
-                onClick={() => highlightComment(comment.id)}
-                title={`${comment.section}: ${comment.issue}`}
-                className={`absolute flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-xs font-bold text-white shadow ${
-                  comment.priority === "must_fix"
-                    ? "bg-red-600"
-                    : comment.priority === "minor"
-                      ? "bg-amber-600"
-                      : "bg-blue-600"
-                } ${activeCommentId === comment.id ? "ring-4 ring-black/70" : ""}`}
-                style={{ top: pos.top, left: pos.left }}
-              >
-                {index + 1}
-              </button>
-            );
-          })}
+            {comments.map((comment, index) => {
+              const pos = getPinPosition(comment, index, comments.length);
+              return (
+                <button
+                  key={comment.id}
+                  type="button"
+                  onClick={() => highlightComment(comment.id)}
+                  title={`${comment.section}: ${comment.issue}`}
+                  className={`absolute flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-xs font-bold text-white shadow ${
+                    comment.priority === "must_fix"
+                      ? "bg-red-600"
+                      : comment.priority === "minor"
+                        ? "bg-amber-600"
+                        : "bg-blue-600"
+                  } ${activeCommentId === comment.id ? "ring-4 ring-black/70" : ""}`}
+                  style={{ top: pos.top, left: pos.left }}
+                >
+                  {index + 1}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </section>
     </div>
