@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import type { QcComment, QcPriority, QcStatus } from "@/lib/qc-types";
 
 type Props = {
@@ -32,25 +32,15 @@ export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComment
   const [filter, setFilter] = useState<Filter>("all");
   const [savingId, setSavingId] = useState<number | null>(null);
   const [activeCommentId, setActiveCommentId] = useState<number | null>(null);
-  const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   const filtered = useMemo(() => {
     if (filter === "all") return comments;
     return comments.filter((c) => c.priority === filter);
   }, [comments, filter]);
 
-  function postCommentsToIframe() {
-    const iframeWindow = iframeRef.current?.contentWindow;
-    if (!iframeWindow) return;
-    iframeWindow.postMessage({ type: "qc-comments", comments }, "*");
-    if (activeCommentId != null) {
-      iframeWindow.postMessage({ type: "qc-highlight", commentId: activeCommentId }, "*");
-    }
-  }
-
-  useEffect(() => {
-    postCommentsToIframe();
-  }, [comments, activeCommentId]);
+  const screenshotUrl = `https://image.thum.io/get/width/1440/crop/900/${encodeURIComponent(
+    stagingUrl,
+  )}`;
 
   async function updateStatus(commentId: number, status: QcStatus) {
     setSavingId(commentId);
@@ -72,10 +62,32 @@ export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComment
     }
   }
 
+  function getPinPosition(comment: QcComment, index: number, total: number) {
+    const section = comment.section.toLowerCase();
+    if (section.includes("navigation") || section.includes("nav")) {
+      return { top: "4%", left: "50%" };
+    }
+    if (section.includes("hero")) {
+      return { top: "20%", left: "50%" };
+    }
+    if (section.includes("footer")) {
+      return { top: "92%", left: "50%" };
+    }
+    if (section.includes("cards") || section.includes("card")) {
+      return { top: "50%", left: "50%" };
+    }
+    if (section.includes("cta")) {
+      return { top: "40%", left: "50%" };
+    }
+    const step = 70 / Math.max(1, total);
+    return {
+      top: `${Math.min(88, 15 + step * index)}%`,
+      left: `${20 + ((index * 17) % 60)}%`,
+    };
+  }
+
   function highlightComment(commentId: number) {
     setActiveCommentId(commentId);
-    const iframeWindow = iframeRef.current?.contentWindow;
-    iframeWindow?.postMessage({ type: "qc-highlight", commentId }, "*");
   }
 
   return (
@@ -150,13 +162,34 @@ export function ReviewWorkspace({ reviewId, stagingUrl, comments: initialComment
       </section>
 
       <section className="rounded-xl border border-zinc-200 p-2 dark:border-zinc-800">
-        <iframe
-          ref={iframeRef}
-          src={`/api/proxy?url=${encodeURIComponent(stagingUrl)}`}
-          onLoad={postCommentsToIframe}
-          className="h-[80vh] w-full rounded-md border border-zinc-200 dark:border-zinc-800"
-          title="Staging preview with QC overlays"
-        />
+        <div className="relative overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-800">
+          <img
+            src={screenshotUrl}
+            alt="Staging preview screenshot"
+            className="h-auto w-full"
+          />
+          {comments.map((comment, index) => {
+            const pos = getPinPosition(comment, index, comments.length);
+            return (
+              <button
+                key={comment.id}
+                type="button"
+                onClick={() => highlightComment(comment.id)}
+                title={`${comment.section}: ${comment.issue}`}
+                className={`absolute flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-xs font-bold text-white shadow ${
+                  comment.priority === "must_fix"
+                    ? "bg-red-600"
+                    : comment.priority === "minor"
+                      ? "bg-amber-600"
+                      : "bg-blue-600"
+                } ${activeCommentId === comment.id ? "ring-4 ring-black/70" : ""}`}
+                style={{ top: pos.top, left: pos.left }}
+              >
+                {index + 1}
+              </button>
+            );
+          })}
+        </div>
       </section>
     </div>
   );
