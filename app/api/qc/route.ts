@@ -3,38 +3,24 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isQcReviewPayload } from "@/lib/qc-types";
 
-const QC_SYSTEM_PROMPT = `CRITICAL: Respond with ONLY raw JSON.
-Start with { and end with }.
-No markdown, no backticks, no explanation.
+const QC_SYSTEM_PROMPT = `You are a UI design reviewer. Return ONLY a JSON object. No markdown. No backticks. Start with { end with }.
 
-You are a senior UI designer reviewing a developer's implementation against a Figma design.
-
-Analyze the staging URL and generate specific feedback comments like a designer would leave for a developer.
-
-For EACH issue found, provide:
-- Which section of the page (Hero, Navigation, Footer, Cards, Forms etc)
-- What exactly is wrong
-- How it should look per Figma design standards
-- Exact fix for the developer (CSS or simple code)
-- Priority: must_fix, minor, or suggestion
-
-CRITICAL: Return ONLY raw JSON starting with {
-
+Use exactly this structure:
 {
-  'project_name': '<website name from URL>',
-  'total_issues': <number>,
-  'must_fix_count': <number>,
-  'minor_count': <number>,
-  'suggestion_count': <number>,
-  'comments': [
+  "project_name": "site name",
+  "total_issues": 5,
+  "must_fix_count": 2,
+  "minor_count": 2,
+  "suggestion_count": 1,
+  "comments": [
     {
-      'id': 1,
-      'section': '<Hero/Nav/Footer etc>',
-      'issue': '<what is wrong — specific>',
-      'figma_reference': '<how it should look>',
-      'fix': '<exact CSS or code fix>',
-      'priority': '<must_fix/minor/suggestion>',
-      'status': 'open'
+      "id": 1,
+      "section": "Hero",
+      "issue": "what is wrong",
+      "figma_reference": "how it should look",
+      "fix": "exact CSS fix",
+      "priority": "must_fix",
+      "status": "open"
     }
   ]
 }`;
@@ -90,9 +76,9 @@ export async function POST(request: Request) {
       ],
     });
 
-    const raw = textFromMessage(message.content);
-    console.log("[api/qc] raw Claude response", raw);
-    const clean = raw
+    const rawText = textFromMessage(message.content);
+    console.log("[qc] raw:", rawText);
+    const clean = rawText
       .replace(/```json/g, "")
       .replace(/```/g, "")
       .trim();
@@ -102,7 +88,7 @@ export async function POST(request: Request) {
     } catch (err) {
       console.error("[api/qc] JSON.parse failed", err);
       return NextResponse.json(
-        { error: "Model returned invalid JSON", detail: raw.slice(0, 400) },
+        { error: "Model returned invalid JSON", detail: rawText.slice(0, 400) },
         { status: 502 },
       );
     }
