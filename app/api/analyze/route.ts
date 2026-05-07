@@ -18,38 +18,59 @@ Use this exact structure:
   "categories": {
     "visual_hierarchy": {
       "score": <0-100>,
-      "issues": [{"text": "<the issue description>", "priority": "<must_have OR good_to_have OR advanced>", "impact": "<one line business impact>"}],
-      "suggestions": [{"text": "<the suggestion>", "priority": "<must_have OR good_to_have OR advanced>"}]
+      "issues": ["issue text here"],
+      "issue_priorities": ["must_have"],
+      "issue_impacts": ["fixing this can reduce bounce by 15%"],
+      "suggestions": ["suggestion text here"],
+      "suggestion_priorities": ["must_have"]
     },
     "ux_consistency": {
       "score": <0-100>,
-      "issues": [{"text": "<the issue description>", "priority": "<must_have OR good_to_have OR advanced>", "impact": "<one line business impact>"}],
-      "suggestions": [{"text": "<the suggestion>", "priority": "<must_have OR good_to_have OR advanced>"}]
+      "issues": ["issue text here"],
+      "issue_priorities": ["must_have"],
+      "issue_impacts": ["fixing this can reduce bounce by 15%"],
+      "suggestions": ["suggestion text here"],
+      "suggestion_priorities": ["must_have"]
     },
     "conversion_potential": {
       "score": <0-100>,
-      "issues": [{"text": "<the issue description>", "priority": "<must_have OR good_to_have OR advanced>", "impact": "<one line business impact>"}],
-      "suggestions": [{"text": "<the suggestion>", "priority": "<must_have OR good_to_have OR advanced>"}]
+      "issues": ["issue text here"],
+      "issue_priorities": ["must_have"],
+      "issue_impacts": ["fixing this can reduce bounce by 15%"],
+      "suggestions": ["suggestion text here"],
+      "suggestion_priorities": ["must_have"]
     },
     "accessibility": {
       "score": <0-100>,
-      "issues": [{"text": "<the issue description>", "priority": "<must_have OR good_to_have OR advanced>", "impact": "<one line business impact>"}],
-      "suggestions": [{"text": "<the suggestion>", "priority": "<must_have OR good_to_have OR advanced>"}]
+      "issues": ["issue text here"],
+      "issue_priorities": ["must_have"],
+      "issue_impacts": ["fixing this can reduce bounce by 15%"],
+      "suggestions": ["suggestion text here"],
+      "suggestion_priorities": ["must_have"]
     },
     "content_clarity": {
       "score": <0-100>,
-      "issues": [{"text": "<the issue description>", "priority": "<must_have OR good_to_have OR advanced>", "impact": "<one line business impact>"}],
-      "suggestions": [{"text": "<the suggestion>", "priority": "<must_have OR good_to_have OR advanced>"}]
+      "issues": ["issue text here"],
+      "issue_priorities": ["must_have"],
+      "issue_impacts": ["fixing this can reduce bounce by 15%"],
+      "suggestions": ["suggestion text here"],
+      "suggestion_priorities": ["must_have"]
     },
     "information_architecture": {
       "score": <0-100>,
-      "issues": [{"text": "<the issue description>", "priority": "<must_have OR good_to_have OR advanced>", "impact": "<one line business impact>"}],
-      "suggestions": [{"text": "<the suggestion>", "priority": "<must_have OR good_to_have OR advanced>"}]
+      "issues": ["issue text here"],
+      "issue_priorities": ["must_have"],
+      "issue_impacts": ["fixing this can reduce bounce by 15%"],
+      "suggestions": ["suggestion text here"],
+      "suggestion_priorities": ["must_have"]
     },
     "product_strategy": {
       "score": <0-100>,
-      "issues": [{"text": "<the issue description>", "priority": "<must_have OR good_to_have OR advanced>", "impact": "<one line business impact>"}],
-      "suggestions": [{"text": "<the suggestion>", "priority": "<must_have OR good_to_have OR advanced>"}]
+      "issues": ["issue text here"],
+      "issue_priorities": ["must_have"],
+      "issue_impacts": ["fixing this can reduce bounce by 15%"],
+      "suggestions": ["suggestion text here"],
+      "suggestion_priorities": ["must_have"]
     }
   },
   "top_3_priorities": ["<priority 1>", "<priority 2>", "<priority 3>"],
@@ -60,6 +81,10 @@ Priority definitions:
 - must_have: Fixing this directly affects conversion or trust. Do this first.
 - good_to_have: Improves experience but not urgent.
 - advanced: Nice to have, complex to implement.
+
+For every issue, provide matching priority and impact in the same array index.
+The arrays "issues", "issue_priorities", and "issue_impacts" must always have the same length.
+The arrays "suggestions" and "suggestion_priorities" must always have the same length.
 
 For information_architecture, review:
 - Navigation structure and labeling
@@ -72,7 +97,11 @@ For product_strategy, review:
 - Target audience alignment
 - CTA placement and messaging
 - Business goal vs user goal balance
-- Conversion funnel logic`;
+- Conversion funnel logic
+
+CRITICAL: Output ONLY raw JSON.
+Start with { end with }.
+No markdown, no backticks.`;
 
 function textFromMessage(content: Anthropic.Message["content"]): string {
   return content
@@ -175,7 +204,7 @@ export async function POST(request: Request) {
 
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 3000,
+      max_tokens: 4000,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: userContent }],
     });

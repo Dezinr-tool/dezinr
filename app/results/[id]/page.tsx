@@ -1,14 +1,10 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import type {
-  AnalysisAiResponse,
-  IssueItem,
-  PriorityLevel,
-  SuggestionItem,
-} from "@/lib/analysis-types";
+import type { AnalysisAiResponse } from "@/lib/analysis-types";
 import { FeedbackSection } from "./feedback-section";
 import { ExportActions } from "./export-actions";
+import { AnnotationPoint } from "./annotation-point";
 
 const CATEGORY_LABELS: Record<string, string> = {
   visual_hierarchy: "Visual hierarchy",
@@ -30,29 +26,6 @@ const CATEGORY_SECTIONS: Record<string, string> = {
   product_strategy: "Funnel",
 };
 
-function getPriorityMeta(priority?: PriorityLevel) {
-  switch (priority) {
-    case "must_have":
-      return {
-        label: "Must Fix",
-        className:
-          "bg-red-100 text-red-800 border border-red-200 dark:bg-red-950/40 dark:text-red-200 dark:border-red-900",
-      };
-    case "good_to_have":
-      return {
-        label: "Good to Have",
-        className:
-          "bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-200 dark:border-amber-900",
-      };
-    case "advanced":
-    default:
-      return {
-        label: "Advanced",
-        className:
-          "bg-blue-100 text-blue-800 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-200 dark:border-blue-900",
-      };
-  }
-}
 
 export default async function ResultsPage({
   params,
@@ -155,32 +128,18 @@ export default async function ResultsPage({
                 <section className="rounded-md border-l-4 border-red-400 bg-red-50 p-3 dark:border-red-500 dark:bg-red-950/20">
                   <h4 className="text-sm font-medium text-red-900 dark:text-red-200">Issues</h4>
                   <div className="mt-2 grid gap-2">
-                    {(cat.issues?.length
-                      ? cat.issues
-                      : [{ text: "No major issues flagged in this section.", priority: "advanced", impact: "" }]).map(
+                    {(cat.issues?.length ? cat.issues : ["No major issues flagged in this section."]).map(
                       (issue, i) => {
-                        const issueItem: IssueItem =
-                          typeof issue === "string"
-                            ? { text: issue, priority: "advanced", impact: "" }
-                            : issue;
-                        const priority = getPriorityMeta(issueItem.priority);
+                        const impact = cat.issue_impacts?.[i];
                         return (
-                          <div
+                          <AnnotationPoint
                             key={i}
-                            className="rounded-md bg-white/80 p-2 text-sm text-red-900 dark:bg-zinc-950/50 dark:text-red-100"
-                          >
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${priority.className}`}>
-                                {priority.label}
-                              </span>
-                              <p>{issueItem.text}</p>
-                            </div>
-                            {issueItem.impact ? (
-                              <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-300">
-                                📈 {issueItem.impact}
-                              </p>
-                            ) : null}
-                          </div>
+                            analysisId={row.id}
+                            category={key}
+                            text={issue}
+                            priority={cat.issue_priorities?.[i]}
+                            impact={impact}
+                          />
                         );
                       },
                     )}
@@ -194,28 +153,17 @@ export default async function ResultsPage({
                   <div className="mt-2 grid gap-2">
                     {(cat.suggestions?.length
                       ? cat.suggestions
-                      : [{ text: "No suggestions were provided for this section.", priority: "advanced" }]).map(
-                      (suggestion, i) => {
-                        const suggestionItem: SuggestionItem =
-                          typeof suggestion === "string"
-                            ? { text: suggestion, priority: "advanced" }
-                            : suggestion;
-                        const priority = getPriorityMeta(suggestionItem.priority);
-                        return (
-                          <div
-                            key={i}
-                            className="rounded-md bg-white/80 p-2 text-sm text-emerald-900 dark:bg-zinc-950/50 dark:text-emerald-100"
-                          >
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${priority.className}`}>
-                                {priority.label}
-                              </span>
-                              <p>{suggestionItem.text}</p>
-                            </div>
-                          </div>
-                        );
-                      },
-                    )}
+                      : ["No suggestions were provided for this section."]).map((suggestion, i) => {
+                      return (
+                        <AnnotationPoint
+                          key={i}
+                          analysisId={row.id}
+                          category={key}
+                          text={suggestion}
+                          priority={cat.suggestion_priorities?.[i]}
+                        />
+                      );
+                    })}
                   </div>
                 </section>
               </div>

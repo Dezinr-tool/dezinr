@@ -2,22 +2,14 @@
 
 export type CategoryReview = {
   score: number;
-  issues: Array<string | IssueItem>;
-  suggestions: Array<string | SuggestionItem>;
+  issues: string[];
+  issue_priorities?: PriorityLevel[];
+  issue_impacts?: string[];
+  suggestions: string[];
+  suggestion_priorities?: PriorityLevel[];
 };
 
 export type PriorityLevel = "must_have" | "good_to_have" | "advanced";
-
-export type IssueItem = {
-  text: string;
-  priority: PriorityLevel;
-  impact: string;
-};
-
-export type SuggestionItem = {
-  text: string;
-  priority: PriorityLevel;
-};
 
 export type AnalysisAiResponse = {
   overall_score: number;
