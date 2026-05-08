@@ -102,3 +102,77 @@ export async function POST(
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const { id } = await params;
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const body = (await request.json()) as {
+      commentId?: number;
+      issue?: string;
+    };
+
+    const commentId = body.commentId;
+    const nextIssue = body.issue?.trim();
+    if (typeof commentId !== "number" || !nextIssue) {
+      return NextResponse.json({ error: "commentId and issue are required" }, { status: 400 });
+    }
+
+    const { data: review, error: loadError } = await supabase
+      .from("qc_reviews")
+      .select("id, user_id, ai_comments")
+      .eq("id", id)
+      .eq("user_id", user.id)
+      .single();
+
+    if (loadError || !review) {
+      return NextResponse.json({ error: "Review not found" }, { status: 404 });
+    }
+
+    const comments = (review.ai_comments as unknown as QcComment[]) ?? [];
+    const original = comments.find((comment) => comment.id === commentId);
+    if (!original) {
+      return NextResponse.json({ error: "Comment not found" }, { status: 404 });
+    }
+
+    const next = comments.map((comment) =>
+      comment.id === commentId ? { ...comment, issue: nextIssue } : comment,
+    );
+
+    const { error: updateError } = await supabase
+      .from("qc_reviews")
+      .update({
+        ai_comments: next as unknown as Record<string, unknown>[],
+      })
+      .eq("id", id)
+      .eq("user_id", user.id);
+
+    if (updateError) {
+      return NextResponse.json(
+        { error: "Failed to update comment", detail: updateError.message },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      comment: { ...original, issue: nextIssue },
+      original_issue: original.issue,
+      edited_issue: nextIssue,
+    });
+  } catch (err) {
+    console.error("[api/qc/:id/comments PATCH] unhandled", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}

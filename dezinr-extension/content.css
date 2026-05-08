@@ -1,0 +1,54 @@
+.dzn-sidebar {
+  all: initial;
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 380px;
+  height: 100vh;
+  z-index: 999999;
+  background: #111827;
+  color: #f9fafb;
+  border-left: 1px solid #374151;
+  font-family: Arial, sans-serif;
+  box-sizing: border-box;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.dzn-pin {
+  position: fixed;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #dc2626;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 999999;
+  border: none;
+}
+
+.dzn-bubble {
+  position: absolute;
+  width: 280px;
+  background: #fff;
+  color: #111827;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  padding: 10px;
+  z-index: 1000000;
+}
+
+.dzn-btn {
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 10px;
+}

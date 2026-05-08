@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Dezinr QC",
+  "version": "1.0.0",
+  "description": "AI-powered design QC overlay for any staging site",
+  "permissions": ["activeTab", "storage", "tabs", "scripting"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "background.js" },
+  "action": {
+    "default_popup": "popup/popup.html"
+  }
+}
