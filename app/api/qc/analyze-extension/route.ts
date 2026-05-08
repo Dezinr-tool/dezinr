@@ -19,6 +19,8 @@ Rules:
 - No special characters
 - Keep all text simple and plain
 - Maximum 8 comments
+- x_percent and y_percent represent where on the page the issue is visible (0 to 100)
+- Spread issues across different parts of the page
 
 JSON format:
 {
@@ -35,7 +37,9 @@ JSON format:
       "figma_reference": "Should be larger and bold",
       "fix": "Increase font size and weight",
       "priority": "must_fix",
-      "status": "open"
+      "status": "open",
+      "x_percent": 50,
+      "y_percent": 10
     }
   ]
 }`;
@@ -155,7 +159,6 @@ export async function POST(request: Request) {
       figma_url: figmaUrl,
       user_id: userId,
       ai_comments: comments,
-      // requested "title" derived from domain is mapped to project_name column
       project_name: domainTitle,
       total_issues: review.total_issues,
       must_fix_count: review.must_fix_count,
