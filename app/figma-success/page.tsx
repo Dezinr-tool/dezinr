@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 
-export default function FigmaSuccessPage() {
+function FigmaSuccessContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
 
@@ -20,5 +20,13 @@ export default function FigmaSuccessPage() {
         <p className="mt-2 text-emerald-800">You can close this tab.</p>
       </div>
     </main>
+  );
+}
+
+export default function FigmaSuccessPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <FigmaSuccessContent />
+    </Suspense>
   );
 }
