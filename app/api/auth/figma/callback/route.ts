@@ -1,62 +1,34 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
 const TOKEN_URL = "https://api.figma.com/v1/oauth/token";
 const REDIRECT_URI =
   process.env.FIGMA_REDIRECT_URI ??
   "https://dezinr.vercel.app/api/auth/figma/callback";
 
-const FIGMA_COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
-
 export async function GET(request: NextRequest) {
   const clientId = process.env.FIGMA_CLIENT_ID;
   const clientSecret = process.env.FIGMA_CLIENT_SECRET;
-  if (!clientId || !clientSecret) {
-    return NextResponse.json(
-      { error: "Figma OAuth is not configured" },
-      { status: 500 },
-    );
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+
+  if (!clientId || !clientSecret || !serviceRoleKey || !supabaseUrl) {
+    return NextResponse.json({ error: "Server config error" }, { status: 500 });
   }
 
   const url = request.nextUrl;
-  const figmaTokenParam = url.searchParams.get("figma_token");
   const code = url.searchParams.get("code");
-  const state = url.searchParams.get("state");
   const error = url.searchParams.get("error");
 
   if (error) {
-    const dashboard = new URL("/dashboard", request.url);
-    dashboard.searchParams.set("figma_error", error);
-    return NextResponse.redirect(dashboard);
+    return NextResponse.redirect(new URL("/dashboard?figma_error=" + error, request.url));
   }
 
-  // Second hop: store token from query in httpOnly cookie, then redirect (clean URL)
-  if (figmaTokenParam && !code) {
-    const dashboard = new URL("/dashboard", request.url);
-    const res = NextResponse.redirect(dashboard);
-    res.cookies.set("figma_token", figmaTokenParam, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: FIGMA_COOKIE_MAX_AGE,
-    });
-    res.headers.set("Cache-Control", "no-store");
-    return res;
+  if (!code) {
+    return NextResponse.redirect(new URL("/dashboard?figma_error=missing_code", request.url));
   }
 
-  if (!code || !state) {
-    const dashboard = new URL("/dashboard", request.url);
-    dashboard.searchParams.set("figma_error", "missing_code_or_state");
-    return NextResponse.redirect(dashboard);
-  }
-
-  const cookieState = request.cookies.get("figma_oauth_state")?.value;
-  if (!cookieState || cookieState !== state) {
-    const dashboard = new URL("/dashboard", request.url);
-    dashboard.searchParams.set("figma_error", "invalid_state");
-    return NextResponse.redirect(dashboard);
-  }
-
+  // Exchange code for token
   const body = new URLSearchParams({
     client_id: clientId,
     client_secret: clientSecret,
@@ -67,9 +39,7 @@ export async function GET(request: NextRequest) {
 
   const tokenRes = await fetch(TOKEN_URL, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: body.toString(),
   });
 
@@ -80,22 +50,63 @@ export async function GET(request: NextRequest) {
   };
 
   if (!tokenRes.ok || !tokenJson.access_token) {
-    const dashboard = new URL("/dashboard", request.url);
-    dashboard.searchParams.set(
-      "figma_error",
-      tokenJson.error_description ?? tokenJson.error ?? "token_exchange_failed",
+    return NextResponse.redirect(
+      new URL("/dashboard?figma_error=token_exchange_failed", request.url)
     );
-    const res = NextResponse.redirect(dashboard);
-    res.cookies.delete("figma_oauth_state");
-    return res;
   }
 
-  const continueUrl = new URL(request.url);
-  continueUrl.search = "";
-  continueUrl.searchParams.set("figma_token", tokenJson.access_token);
+  const figmaToken = tokenJson.access_token;
 
-  const res = NextResponse.redirect(continueUrl);
-  res.cookies.delete("figma_oauth_state");
+  // Save token to cookie for status check
+  const dashboard = new URL("/dashboard", request.url);
+  const res = NextResponse.redirect(dashboard);
+  res.cookies.set("figma_token", figmaToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 24 * 30,
+  });
+
+  // Also try to save to Supabase using service role (works regardless of RLS)
+  try {
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    
+    // Get user from auth cookie
+    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (anonKey) {
+      // Get session from request cookies
+      const cookieHeader = request.headers.get("cookie") || "";
+      const authTokenMatch = cookieHeader.match(/sb-[^-]+-auth-token=([^;]+)/);
+      
+      if (authTokenMatch) {
+        const authToken = decodeURIComponent(authTokenMatch[1]);
+        try {
+          const parsed = JSON.parse(authToken);
+          const accessToken = Array.isArray(parsed) ? parsed[0] : parsed?.access_token;
+          
+          if (accessToken) {
+            const userClient = createClient(supabaseUrl, anonKey, {
+              global: { headers: { Authorization: `Bearer ${accessToken}` } },
+            });
+            const { data: { user } } = await userClient.auth.getUser();
+            
+            if (user?.id) {
+              await supabase.from("profiles").upsert({
+                id: user.id,
+                figma_access_token: figmaToken,
+              });
+            }
+          }
+        } catch {
+          // Silent fail - cookie approach will still work
+        }
+      }
+    }
+  } catch {
+    // Silent fail
+  }
+
   res.headers.set("Cache-Control", "no-store");
   return res;
 }
