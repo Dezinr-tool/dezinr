@@ -9,7 +9,9 @@ const figmaUrlInput = document.getElementById("figma-url");
 const analysisLoading = document.getElementById("analysis-loading");
 const analysisError = document.getElementById("analysis-error");
 const connectFigmaBtn = document.getElementById("connect-figma-btn");
+const connectFigmaRow = document.getElementById("connect-figma-row");
 const figmaStatusRow = document.getElementById("figma-status-row");
+const figmaStatusEl = document.getElementById("figma-status");
 const figmaRequiredHint = document.getElementById("figma-required-hint");
 const startAnalysisSection = document.getElementById("start-analysis-section");
 
@@ -18,17 +20,20 @@ const passwordInput = document.getElementById("password");
 
 function setFigmaConnected(connected) {
   if (connected) {
+    connectFigmaRow.classList.add("hidden");
     figmaStatusRow.classList.remove("hidden");
+    figmaStatusEl.textContent = "Figma Connected ✓";
     figmaRequiredHint.classList.add("hidden");
     startAnalysisSection.classList.remove("hidden");
   } else {
+    connectFigmaRow.classList.remove("hidden");
     figmaStatusRow.classList.add("hidden");
     figmaRequiredHint.classList.remove("hidden");
     startAnalysisSection.classList.add("hidden");
   }
 }
 
-async function refreshFigmaStatus() {
+function checkFigmaStatus() {
   chrome.storage.local.get(["authToken", "dznToken"], async (result) => {
     const token = result.authToken || result.dznToken;
     if (!token) {
@@ -36,7 +41,8 @@ async function refreshFigmaStatus() {
       return;
     }
     try {
-      const response = await fetch(`${API_BASE}/api/auth/extension-profile`, {
+      const response = await fetch(`${API_BASE}/api/auth/figma/status`, {
+        credentials: "include",
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await response.json().catch(() => ({}));
@@ -44,7 +50,7 @@ async function refreshFigmaStatus() {
         setFigmaConnected(false);
         return;
       }
-      setFigmaConnected(Boolean(data?.figmaConnected));
+      setFigmaConnected(Boolean(data?.connected));
     } catch {
       setFigmaConnected(false);
     }
@@ -58,7 +64,7 @@ function setLoggedIn(email) {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     tabUrlInput.value = tabs[0]?.url || "";
   });
-  refreshFigmaStatus();
+  checkFigmaStatus();
 }
 
 function setLoggedOut() {
@@ -125,11 +131,12 @@ document.getElementById("start-analysis-btn").addEventListener("click", async ()
         return;
       }
 
-      const profileRes = await fetch(`${API_BASE}/api/auth/extension-profile`, {
+      const statusRes = await fetch(`${API_BASE}/api/auth/figma/status`, {
+        credentials: "include",
         headers: { Authorization: `Bearer ${token}` },
       });
-      const profileData = await profileRes.json().catch(() => ({}));
-      if (!profileRes.ok || !profileData?.figmaConnected) {
+      const statusData = await statusRes.json().catch(() => ({}));
+      if (!statusRes.ok || !statusData?.connected) {
         analysisError.textContent = "Connect Figma first, then try again.";
         return;
       }
@@ -199,6 +206,12 @@ document.getElementById("logout-btn").addEventListener("click", () => {
 
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden && !userView.classList.contains("hidden")) {
-    refreshFigmaStatus();
+    checkFigmaStatus();
+  }
+});
+
+window.addEventListener("focus", () => {
+  if (!userView.classList.contains("hidden")) {
+    checkFigmaStatus();
   }
 });
