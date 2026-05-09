@@ -8,9 +8,48 @@ const tabUrlInput = document.getElementById("tab-url");
 const figmaUrlInput = document.getElementById("figma-url");
 const analysisLoading = document.getElementById("analysis-loading");
 const analysisError = document.getElementById("analysis-error");
+const connectFigmaBtn = document.getElementById("connect-figma-btn");
+const figmaStatusRow = document.getElementById("figma-status-row");
+const figmaRequiredHint = document.getElementById("figma-required-hint");
+const startAnalysisSection = document.getElementById("start-analysis-section");
 
 const emailInput = document.getElementById("email");
 const passwordInput = document.getElementById("password");
+
+function setFigmaConnected(connected) {
+  if (connected) {
+    figmaStatusRow.classList.remove("hidden");
+    figmaRequiredHint.classList.add("hidden");
+    startAnalysisSection.classList.remove("hidden");
+  } else {
+    figmaStatusRow.classList.add("hidden");
+    figmaRequiredHint.classList.remove("hidden");
+    startAnalysisSection.classList.add("hidden");
+  }
+}
+
+async function refreshFigmaStatus() {
+  chrome.storage.local.get(["authToken", "dznToken"], async (result) => {
+    const token = result.authToken || result.dznToken;
+    if (!token) {
+      setFigmaConnected(false);
+      return;
+    }
+    try {
+      const response = await fetch(`${API_BASE}/api/auth/extension-profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setFigmaConnected(false);
+        return;
+      }
+      setFigmaConnected(Boolean(data?.figmaConnected));
+    } catch {
+      setFigmaConnected(false);
+    }
+  });
+}
 
 function setLoggedIn(email) {
   loginView.classList.add("hidden");
@@ -19,11 +58,13 @@ function setLoggedIn(email) {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     tabUrlInput.value = tabs[0]?.url || "";
   });
+  refreshFigmaStatus();
 }
 
 function setLoggedOut() {
   userView.classList.add("hidden");
   loginView.classList.remove("hidden");
+  setFigmaConnected(false);
 }
 
 chrome.runtime.sendMessage({ type: "dzn:get-auth" }, (resp) => {
@@ -63,6 +104,10 @@ document.getElementById("login-btn").addEventListener("click", async () => {
   }
 });
 
+connectFigmaBtn.addEventListener("click", () => {
+  chrome.tabs.create({ url: `${API_BASE}/api/auth/figma` });
+});
+
 document.getElementById("start-analysis-btn").addEventListener("click", async () => {
   analysisError.textContent = "";
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -80,6 +125,15 @@ document.getElementById("start-analysis-btn").addEventListener("click", async ()
         return;
       }
 
+      const profileRes = await fetch(`${API_BASE}/api/auth/extension-profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const profileData = await profileRes.json().catch(() => ({}));
+      if (!profileRes.ok || !profileData?.figmaConnected) {
+        analysisError.textContent = "Connect Figma first, then try again.";
+        return;
+      }
+
       analysisLoading.classList.remove("hidden");
 
       try {
@@ -87,7 +141,7 @@ document.getElementById("start-analysis-btn").addEventListener("click", async ()
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`,
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
             stagingUrl: currentTabUrl,
@@ -102,29 +156,35 @@ document.getElementById("start-analysis-btn").addEventListener("click", async ()
           return;
         }
 
-        chrome.storage.local.set({
-          reviewId: data.reviewId,
-          stagingUrl: currentTabUrl
-        }, () => {
-          chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-            const tabId = tabs[0]?.id;
-            if (!tabId) {
-              analysisError.textContent = "No active tab found.";
-              analysisLoading.classList.add("hidden");
-              return;
-            }
-            chrome.runtime.sendMessage({
-              type: "ACTIVATE_TAB",
-              tabId: tabs[0].id,
-              reviewId: data.reviewId,
-              stagingUrl: currentTabUrl,
-              comments: data.comments || []
-            }, (response) => {
-              console.log("Message sent to content script:", response);
-              window.close();
+        chrome.storage.local.set(
+          {
+            reviewId: data.reviewId,
+            stagingUrl: currentTabUrl,
+          },
+          () => {
+            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+              const tabId = tabs[0]?.id;
+              if (!tabId) {
+                analysisError.textContent = "No active tab found.";
+                analysisLoading.classList.add("hidden");
+                return;
+              }
+              chrome.runtime.sendMessage(
+                {
+                  type: "ACTIVATE_TAB",
+                  tabId: tabs[0].id,
+                  reviewId: data.reviewId,
+                  stagingUrl: currentTabUrl,
+                  comments: data.comments || [],
+                },
+                (response) => {
+                  console.log("Message sent to content script:", response);
+                  window.close();
+                },
+              );
             });
-          });
-        });
+          },
+        );
       } catch (error) {
         analysisError.textContent = String(error);
         analysisLoading.classList.add("hidden");
@@ -135,4 +195,10 @@ document.getElementById("start-analysis-btn").addEventListener("click", async ()
 
 document.getElementById("logout-btn").addEventListener("click", () => {
   chrome.runtime.sendMessage({ type: "dzn:logout" }, () => setLoggedOut());
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && !userView.classList.contains("hidden")) {
+    refreshFigmaStatus();
+  }
 });
