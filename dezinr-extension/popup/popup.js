@@ -34,26 +34,12 @@ function setFigmaConnected(connected) {
 }
 
 function checkFigmaStatus() {
-  chrome.storage.local.get(["authToken", "dznToken"], async (result) => {
-    const token = result.authToken || result.dznToken;
-    if (!token) {
-      setFigmaConnected(false);
+  chrome.storage.local.get(["figmaToken"], (result) => {
+    if (result?.figmaToken) {
+      setFigmaConnected(true);
       return;
     }
-    try {
-      const response = await fetch(`${API_BASE}/api/auth/figma/status`, {
-        credentials: "include",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        setFigmaConnected(false);
-        return;
-      }
-      setFigmaConnected(Boolean(data?.connected));
-    } catch {
-      setFigmaConnected(false);
-    }
+    setFigmaConnected(false);
   });
 }
 
@@ -124,19 +110,14 @@ document.getElementById("start-analysis-btn").addEventListener("click", async ()
       return;
     }
 
-    chrome.storage.local.get(["authToken", "dznToken"], async (result) => {
+    chrome.storage.local.get(["authToken", "dznToken", "figmaToken"], async (result) => {
       const token = result.authToken || result.dznToken;
+      const figmaToken = result.figmaToken;
       if (!token) {
         analysisError.textContent = "Please login again.";
         return;
       }
-
-      const statusRes = await fetch(`${API_BASE}/api/auth/figma/status`, {
-        credentials: "include",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const statusData = await statusRes.json().catch(() => ({}));
-      if (!statusRes.ok || !statusData?.connected) {
+      if (!figmaToken) {
         analysisError.textContent = "Connect Figma first, then try again.";
         return;
       }
@@ -154,6 +135,7 @@ document.getElementById("start-analysis-btn").addEventListener("click", async ()
             stagingUrl: currentTabUrl,
             figmaUrl: figmaUrl,
             token: token,
+            figmaToken: figmaToken,
           }),
         });
         const data = await response.json();

@@ -1,3 +1,5 @@
+window.addEventListener("message", (event) => { if (event.data?.type === "DZN_FIGMA_TOKEN" && event.data?.token) { chrome.storage.local.set({ figmaToken: event.data.token }); } });
+
 if (window.__DZN_LOADED__) {
   console.log("DZN content script already loaded");
 } else {

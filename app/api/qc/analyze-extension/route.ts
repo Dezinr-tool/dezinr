@@ -76,13 +76,21 @@ async function validateFigmaFile(fileKey: string, figmaToken: string): Promise<{
 export async function POST(request: Request) {
   console.log("analyze-extension called");
   try {
-    const body = (await request.json()) as { stagingUrl?: string; figmaUrl?: string };
+    const body = (await request.json()) as {
+      stagingUrl?: string;
+      figmaUrl?: string;
+      figmaToken?: string;
+    };
     const stagingUrl = body.stagingUrl?.trim();
     const figmaUrl = body.figmaUrl?.trim();
+    const figmaToken = body.figmaToken?.trim();
     const token = request.headers.get("authorization")?.replace("Bearer ", "")?.trim();
 
-    if (!stagingUrl || !figmaUrl || !token) {
-      return NextResponse.json({ error: "stagingUrl, figmaUrl and token are required" }, { status: 400, headers: corsHeaders });
+    if (!stagingUrl || !figmaUrl || !figmaToken || !token) {
+      return NextResponse.json(
+        { error: "stagingUrl, figmaUrl, figmaToken and token are required" },
+        { status: 400, headers: corsHeaders },
+      );
     }
 
     const figmaFileKey = extractFigmaFileKey(figmaUrl);
@@ -105,19 +113,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders });
     }
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("figma_access_token")
-      .eq("id", user.id)
-      .single();
-
-    const figmaToken = profile?.figma_access_token;
-
-    if (figmaToken) {
-      const validation = await validateFigmaFile(figmaFileKey, figmaToken);
-      if (!validation.valid) {
-        return NextResponse.json({ error: validation.error || "Invalid Figma file." }, { status: 400, headers: corsHeaders });
-      }
+    const validation = await validateFigmaFile(figmaFileKey, figmaToken);
+    if (!validation.valid) {
+      return NextResponse.json({ error: validation.error || "Invalid Figma file." }, { status: 400, headers: corsHeaders });
     }
 
     const userId = user.id;
